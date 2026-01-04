@@ -35,7 +35,10 @@ export function sendFailed(
 /**
  * Create a NETWORK_ERROR error.
  */
-export function networkError(message: string, cause?: Error): NotificationError {
+export function networkError(
+  message: string,
+  cause?: Error,
+): NotificationError {
   return cause !== undefined
     ? { type: "NETWORK_ERROR", message, cause }
     : { type: "NETWORK_ERROR", message };
@@ -51,7 +54,9 @@ export function notConfigured(message: string): NotificationError {
 /**
  * Create a RATE_LIMITED error.
  */
-export function rateLimited(message: string, remainingMs: number): NotificationError {
+export function rateLimited(
+  message: string,
+  remainingMs: number,
+): NotificationError {
   return { type: "RATE_LIMITED", message, remainingMs };
 }
-

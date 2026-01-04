@@ -93,7 +93,9 @@ export function getLastVentilatorMqttStatus(): VentilatorMqttStatus | null {
  * @param handlers - Event handlers for sensor updates
  * @returns true if connection initiated successfully
  */
-export function initializeMqttClient(handlers: MqttEventHandlers = {}): boolean {
+export function initializeMqttClient(
+  handlers: MqttEventHandlers = {},
+): boolean {
   if (mqttClient) {
     log.warn("MQTT client already initialized");
     return true;
@@ -168,7 +170,10 @@ function subscribeToTopics(client: MqttClient): void {
   for (const topic of topics) {
     client.subscribe(topic, (err) => {
       if (err) {
-        log.error({ topic, error: err.message }, "Failed to subscribe to topic");
+        log.error(
+          { topic, error: err.message },
+          "Failed to subscribe to topic",
+        );
       } else {
         log.debug({ topic }, "Subscribed to topic");
       }
@@ -214,7 +219,10 @@ function handleMessage(topic: string, payload: Buffer): void {
       const data = parseVentilatorMessage(payload, now);
       if (data) {
         sensorState = { ...sensorState, ventilator: data };
-        log.debug({ status: data.status ? "ON" : "OFF" }, "Ventilator MQTT status received");
+        log.debug(
+          { status: data.status ? "ON" : "OFF" },
+          "Ventilator MQTT status received",
+        );
         eventHandlers.onVentilator?.(data);
       }
       break;
@@ -223,7 +231,10 @@ function handleMessage(topic: string, payload: Buffer): void {
     case "flic": {
       const event = parseFlicMessage(payload, now);
       if (event) {
-        log.info({ action: event.action, buttonId: event.buttonId }, "Flic button event");
+        log.info(
+          { action: event.action, buttonId: event.buttonId },
+          "Flic button event",
+        );
         eventHandlers.onFlic?.(event);
       }
       break;
@@ -260,6 +271,8 @@ export function disconnectMqttClient(): void {
 /**
  * Update event handlers (useful for adding SSE broadcast handlers later).
  */
-export function updateEventHandlers(handlers: Partial<MqttEventHandlers>): void {
+export function updateEventHandlers(
+  handlers: Partial<MqttEventHandlers>,
+): void {
   eventHandlers = { ...eventHandlers, ...handlers };
 }

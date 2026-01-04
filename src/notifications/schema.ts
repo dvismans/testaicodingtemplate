@@ -133,4 +133,3 @@ export const COOLDOWN_DURATIONS = {
   /** Temperature alerts - 5 minute cooldown */
   temperature: 300_000,
 } as const;
-

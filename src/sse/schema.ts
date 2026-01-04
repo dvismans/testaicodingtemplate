@@ -1,3 +1,4 @@
+import type { SaunaDoorStatus, SaunaTemperature } from "../mqtt/index.js";
 /**
  * SSE Module - Schemas and Types
  *
@@ -6,7 +7,6 @@
  * @see Rule #4 (Data First)
  */
 import type { PhaseData } from "../smart-meter/index.js";
-import type { SaunaDoorStatus, SaunaTemperature } from "../mqtt/index.js";
 
 // =============================================================================
 // SSE Event Types
@@ -88,4 +88,3 @@ export type SseEvent =
   | VentilatorEvent
   | ConnectionEvent
   | SystemStateEvent;
-

@@ -5,7 +5,7 @@
  *
  * @see TESTING.md - T4 (Mock External Dependencies at Service Boundary)
  */
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock config before importing service
 vi.mock("../../config.js", () => ({
@@ -32,16 +32,16 @@ vi.mock("../../logger.js", () => ({
   }),
 }));
 
+import { getNotificationConfig } from "../../config.js";
 // Import after mocks
 import {
-  sendWhatsAppMessage,
-  sendTemperatureNotification,
-  sendSafetyShutdownNotification,
-  sendCustomNotification,
-  resetCooldownState,
   getCooldownState,
+  resetCooldownState,
+  sendCustomNotification,
+  sendSafetyShutdownNotification,
+  sendTemperatureNotification,
+  sendWhatsAppMessage,
 } from "../service.js";
-import { getNotificationConfig } from "../../config.js";
 
 describe("Notifications Service", () => {
   beforeEach(() => {
@@ -61,10 +61,13 @@ describe("Notifications Service", () => {
   describe("sendWhatsAppMessage", () => {
     test("sends message to WAHA API with correct format", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
 
       // Act
       const result = await sendWhatsAppMessage("Test message");
@@ -79,13 +82,13 @@ describe("Notifications Service", () => {
             "Content-Type": "application/json",
             "X-API-Key": "test-api-key",
           }),
-        })
+        }),
       );
 
       // Verify request body
       const callArgs = vi.mocked(fetch).mock.calls[0];
       expect(callArgs).toBeDefined();
-      const body = JSON.parse(callArgs![1]?.body as string);
+      const body = JSON.parse(callArgs?.[1]?.body as string);
       expect(body.chatId).toBe("31612345678@c.us");
       expect(body.text).toBe("Test message");
     });
@@ -109,11 +112,14 @@ describe("Notifications Service", () => {
         apiKey: "test-api-key",
         phoneNumber: "31612345678",
       });
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: false,
-        status: 422,
-        text: () => Promise.resolve("Session is STOPPED"),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 422,
+          text: () => Promise.resolve("Session is STOPPED"),
+        }),
+      );
 
       // Act
       const result = await sendWhatsAppMessage("Test message");
@@ -134,7 +140,10 @@ describe("Notifications Service", () => {
         apiKey: "test-api-key",
         phoneNumber: "31612345678",
       });
-      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Connection refused")));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new Error("Connection refused")),
+      );
 
       // Act
       const result = await sendWhatsAppMessage("Test message");
@@ -160,10 +169,13 @@ describe("Notifications Service", () => {
 
     test("sends temperature notification with formatted message", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
 
       // Act
       const result = await sendTemperatureNotification(85);
@@ -173,21 +185,24 @@ describe("Notifications Service", () => {
 
       const callArgs = vi.mocked(fetch).mock.calls[0];
       expect(callArgs).toBeDefined();
-      const body = JSON.parse(callArgs![1]?.body as string);
+      const body = JSON.parse(callArgs?.[1]?.body as string);
       expect(body.text).toContain("85");
       expect(body.text).toContain("°C");
     });
 
     test("respects cooldown period", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
 
       // Act - send first notification
       const result1 = await sendTemperatureNotification(85);
-      
+
       // Act - send second notification immediately (should be rate limited)
       const result2 = await sendTemperatureNotification(86);
 
@@ -195,17 +210,20 @@ describe("Notifications Service", () => {
       expect(result1.isOk()).toBe(true);
       expect(result2.isErr()).toBe(true);
       expect(result2._unsafeUnwrapErr().type).toBe("RATE_LIMITED");
-      
+
       // Only one API call should have been made
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 
     test("updates cooldown state after successful send", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
 
       // Initial state should have no cooldown
       const beforeState = getCooldownState();
@@ -235,30 +253,39 @@ describe("Notifications Service", () => {
 
     test("sends safety shutdown notification with phase info", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
 
       // Act
-      const result = await sendSafetyShutdownNotification(["L1 (26A)", "L3 (28A)"]);
+      const result = await sendSafetyShutdownNotification([
+        "L1 (26A)",
+        "L3 (28A)",
+      ]);
 
       // Assert
       expect(result.isOk()).toBe(true);
 
       const callArgs = vi.mocked(fetch).mock.calls[0];
       expect(callArgs).toBeDefined();
-      const body = JSON.parse(callArgs![1]?.body as string);
+      const body = JSON.parse(callArgs?.[1]?.body as string);
       expect(body.text).toContain("L1");
       expect(body.text).toContain("L3");
     });
 
     test("respects cooldown period", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
 
       // Act
       const result1 = await sendSafetyShutdownNotification(["L1"]);
@@ -286,10 +313,13 @@ describe("Notifications Service", () => {
 
     test("sends custom message without cooldown", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
 
       // Act - send multiple custom notifications
       const result1 = await sendCustomNotification("Message 1");
@@ -305,10 +335,13 @@ describe("Notifications Service", () => {
 
     test("sends exact message text provided", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      );
       const customMessage = "Test notification from Sauna Control System";
 
       // Act
@@ -317,9 +350,8 @@ describe("Notifications Service", () => {
       // Assert
       const callArgs = vi.mocked(fetch).mock.calls[0];
       expect(callArgs).toBeDefined();
-      const body = JSON.parse(callArgs![1]?.body as string);
+      const body = JSON.parse(callArgs?.[1]?.body as string);
       expect(body.text).toBe(customMessage);
     });
   });
 });
-

@@ -5,7 +5,7 @@
  *
  * @see TESTING.md - T4 (Mock External Dependencies at Service Boundary)
  */
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock config before importing service
 vi.mock("../../config.js", () => ({
@@ -47,7 +47,11 @@ describe("Smart Meter Service", () => {
   // ===========================================================================
 
   // Helper to create a valid smart meter reading array
-  function createReading(l1: number, l2: number, l3: number): (string | number | null)[] {
+  function createReading(
+    l1: number,
+    l2: number,
+    l3: number,
+  ): (string | number | null)[] {
     const reading = new Array(14).fill(0);
     reading[11] = l1; // L1
     reading[12] = l2; // L2
@@ -58,10 +62,13 @@ describe("Smart Meter Service", () => {
   describe("pollSmartMeter", () => {
     test("returns phase data when API responds with valid data", async () => {
       // Arrange - API returns array with reading (array of values, indices 11-13 are phases)
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([createReading(15.5, 8.2, 12.0)]),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve([createReading(15.5, 8.2, 12.0)]),
+        }),
+      );
 
       // Act
       const result = await pollSmartMeter();
@@ -76,10 +83,13 @@ describe("Smart Meter Service", () => {
 
     test("includes correct API key header in request", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([createReading(10, 10, 10)]),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve([createReading(10, 10, 10)]),
+        }),
+      );
 
       // Act
       await pollSmartMeter();
@@ -91,16 +101,19 @@ describe("Smart Meter Service", () => {
           headers: expect.objectContaining({
             "X-APIkey": "test-api-key",
           }),
-        })
+        }),
       );
     });
 
     test("includes limit and sort query parameters", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([createReading(10, 10, 10)]),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve([createReading(10, 10, 10)]),
+        }),
+      );
 
       // Act
       await pollSmartMeter();
@@ -108,18 +121,21 @@ describe("Smart Meter Service", () => {
       // Assert
       const calls = vi.mocked(fetch).mock.calls;
       expect(calls.length).toBeGreaterThan(0);
-      const calledUrl = calls[0]![0] as string;
+      const calledUrl = calls[0]?.[0] as string;
       expect(calledUrl).toContain("limit=1");
       expect(calledUrl).toContain("sort=desc");
     });
 
     test("returns NETWORK_ERROR when API returns non-OK status", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: "Internal Server Error",
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+        }),
+      );
 
       // Act
       const result = await pollSmartMeter();
@@ -132,7 +148,10 @@ describe("Smart Meter Service", () => {
 
     test("returns NETWORK_ERROR when fetch throws", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Connection refused")));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new Error("Connection refused")),
+      );
 
       // Act
       const result = await pollSmartMeter();
@@ -159,10 +178,13 @@ describe("Smart Meter Service", () => {
 
     test("returns INVALID_RESPONSE when API returns empty array", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([]),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve([]),
+        }),
+      );
 
       // Act
       const result = await pollSmartMeter();
@@ -174,10 +196,13 @@ describe("Smart Meter Service", () => {
 
     test("returns INVALID_RESPONSE when API returns malformed data", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ not: "an array" }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ not: "an array" }),
+        }),
+      );
 
       // Act
       const result = await pollSmartMeter();
@@ -189,10 +214,13 @@ describe("Smart Meter Service", () => {
 
     test("handles zero amperage values correctly", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([createReading(0, 0, 0)]),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve([createReading(0, 0, 0)]),
+        }),
+      );
 
       // Act
       const result = await pollSmartMeter();
@@ -207,10 +235,13 @@ describe("Smart Meter Service", () => {
 
     test("handles high amperage values correctly", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([createReading(32.5, 28.0, 30.2)]),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve([createReading(32.5, 28.0, 30.2)]),
+        }),
+      );
 
       // Act
       const result = await pollSmartMeter();
@@ -224,4 +255,3 @@ describe("Smart Meter Service", () => {
     });
   });
 });
-

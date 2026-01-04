@@ -25,8 +25,8 @@ import {
   turnMcbOff,
   turnMcbOn,
 } from "../mcb/index.js";
-import { getSystemState, getCurrentMcbStatus } from "../monitoring/index.js";
-import { getLastTemperature, getLastDoorStatus } from "../mqtt/index.js";
+import { getCurrentMcbStatus, getSystemState } from "../monitoring/index.js";
+import { getLastDoorStatus, getLastTemperature } from "../mqtt/index.js";
 import { sendCustomNotification } from "../notifications/index.js";
 import {
   broadcastMcbStatus,
@@ -34,13 +34,13 @@ import {
   getClientCount,
   removeClient,
 } from "../sse/index.js";
-import {
-  getVentilatorState,
-  getVentilatorStatusSummary,
-  controlShellyRelay,
-} from "../ventilator/index.js";
 import { BaseLayout } from "../ui/layouts/Base.jsx";
 import { Dashboard } from "../ui/pages/Dashboard.jsx";
+import {
+  controlShellyRelay,
+  getVentilatorState,
+  getVentilatorStatusSummary,
+} from "../ventilator/index.js";
 
 const log = createLogger("api");
 

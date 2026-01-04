@@ -7,19 +7,31 @@
  * @see Rule #27 (Module-Scoped Color-Coded Loggers)
  */
 import { config, getVentilatorConfig } from "../config.js";
-import { createLogger, logOperationComplete, logOperationFailed, logOperationStart } from "../logger.js";
-import { getMcbStatus, turnMcbOff, type McbStatus } from "../mcb/index.js";
 import {
-  getLastDoorStatus,
-  getLastTemperature,
-  initializeMqttClient,
-  disconnectMqttClient,
+  createLogger,
+  logOperationComplete,
+  logOperationFailed,
+  logOperationStart,
+} from "../logger.js";
+import { type McbStatus, getMcbStatus, turnMcbOff } from "../mcb/index.js";
+import {
   type FlicButtonEvent,
   type SaunaDoorStatus,
   type SaunaTemperature,
+  disconnectMqttClient,
+  getLastDoorStatus,
+  getLastTemperature,
+  initializeMqttClient,
 } from "../mqtt/index.js";
-import { sendSafetyShutdownNotification, sendTemperatureNotification } from "../notifications/index.js";
-import { checkThresholds, pollSmartMeter, type PhaseData } from "../smart-meter/index.js";
+import {
+  sendSafetyShutdownNotification,
+  sendTemperatureNotification,
+} from "../notifications/index.js";
+import {
+  type PhaseData,
+  checkThresholds,
+  pollSmartMeter,
+} from "../smart-meter/index.js";
 import {
   broadcastDoor,
   broadcastMcbStatus,
@@ -67,12 +79,20 @@ async function triggerSafetyShutdown(triggerPhases: string[]): Promise<void> {
   const now = Date.now();
   const timeSinceLastOff = now - state.lastSwitchOffTime;
 
-  log.warn({ phases: triggerPhases }, "HIGH AMPERAGE DETECTED - INITIATING MCB SHUTDOWN");
+  log.warn(
+    { phases: triggerPhases },
+    "HIGH AMPERAGE DETECTED - INITIATING MCB SHUTDOWN",
+  );
 
   // Check cooldown
   if (timeSinceLastOff < config.SWITCH_OFF_COOLDOWN_MS) {
-    const remainingCooldown = Math.ceil((config.SWITCH_OFF_COOLDOWN_MS - timeSinceLastOff) / 1000);
-    log.warn({ remainingSeconds: remainingCooldown }, "Still in cooldown period, skipping auto-off");
+    const remainingCooldown = Math.ceil(
+      (config.SWITCH_OFF_COOLDOWN_MS - timeSinceLastOff) / 1000,
+    );
+    log.warn(
+      { remainingSeconds: remainingCooldown },
+      "Still in cooldown period, skipping auto-off",
+    );
     return;
   }
 
@@ -127,7 +147,10 @@ async function handleMcbOffVentilator(): Promise<void> {
   // Use handleMcbOff which sets up the delayed-off timer
   const result = await handleMcbOff();
   if (result.isOk()) {
-    log.info({ delayMinutes: ventConfig.delayOffMinutes }, "Ventilator scheduled for delayed shutdown");
+    log.info(
+      { delayMinutes: ventConfig.delayOffMinutes },
+      "Ventilator scheduled for delayed shutdown",
+    );
     broadcastVentilator(true, ventConfig.delayOffMinutes * 60 * 1000);
   }
 }
@@ -159,7 +182,10 @@ async function handleFlicEvent(event: FlicButtonEvent): Promise<void> {
 
   if (action === "none") return;
 
-  log.info({ buttonAction: event.action, mcbAction: action }, "Flic button triggered MCB action");
+  log.info(
+    { buttonAction: event.action, mcbAction: action },
+    "Flic button triggered MCB action",
+  );
 
   // Determine target state
   let targetOn: boolean;
@@ -286,7 +312,9 @@ export async function startMonitoringLoop(): Promise<void> {
     }
 
     // Wait before next iteration
-    await new Promise((resolve) => setTimeout(resolve, config.POLLING_INTERVAL_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, config.POLLING_INTERVAL_MS),
+    );
   }
 
   log.info("Monitoring loop stopped");
@@ -323,4 +351,3 @@ export function getSystemState(): {
     doorStatus: getLastDoorStatus(),
   };
 }
-

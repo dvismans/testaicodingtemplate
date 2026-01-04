@@ -1,3 +1,4 @@
+import { Hono } from "hono";
 /**
  * API Routes Integration Tests
  *
@@ -6,8 +7,7 @@
  *
  * @see TESTING.md - T3 (Test API Endpoints with Real Routing)
  */
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
-import { Hono } from "hono";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock the service layer modules BEFORE importing routes
 vi.mock("../../mcb/index.js", () => ({
@@ -111,29 +111,29 @@ vi.mock("../../logger.js", () => ({
 }));
 
 // Now import the modules (after mocks are set up)
-import { ok, err } from "neverthrow";
-import { routes } from "../routes.js";
-import { getMcbStatus, turnMcbOn, turnMcbOff } from "../../mcb/index.js";
+import { err, ok } from "neverthrow";
+import { getNotificationConfig, getVentilatorConfig } from "../../config.js";
+import { getMcbStatus, turnMcbOff, turnMcbOn } from "../../mcb/index.js";
+import { getCurrentMcbStatus, getSystemState } from "../../monitoring/index.js";
+import { getLastDoorStatus, getLastTemperature } from "../../mqtt/index.js";
 import { sendCustomNotification } from "../../notifications/index.js";
 import { getClientCount } from "../../sse/index.js";
-import { getLastTemperature, getLastDoorStatus } from "../../mqtt/index.js";
-import { getSystemState, getCurrentMcbStatus } from "../../monitoring/index.js";
 import {
-  getVentilatorStatusSummary,
   controlShellyRelay,
+  getVentilatorStatusSummary,
 } from "../../ventilator/index.js";
-import { getVentilatorConfig, getNotificationConfig } from "../../config.js";
+import { routes } from "../routes.js";
 
 // Create a test app with the routes
 function createTestApp() {
   const app = new Hono();
-  
+
   // Add minimal middleware for requestId
   app.use("*", async (c, next) => {
     c.set("requestId", "test-request-id");
     await next();
   });
-  
+
   app.route("/", routes);
   return app;
 }
@@ -145,7 +145,7 @@ describe("API Routes", () => {
     // Reset all mocks to their initial state
     vi.clearAllMocks();
 
-    // Reset mock return values to defaults (defined in vi.mock factories above)
+    // Reset mock return values to defaults (matching actual type signatures)
     vi.mocked(getVentilatorConfig).mockReturnValue({
       enabled: true,
       ipAddress: "192.168.1.100",
@@ -155,6 +155,7 @@ describe("API Routes", () => {
     });
     vi.mocked(getNotificationConfig).mockReturnValue({
       serverUrl: "http://waha.test",
+      apiKey: "test-api-key",
       phoneNumber: "1234567890",
     });
     vi.mocked(getSystemState).mockReturnValue({
@@ -162,19 +163,13 @@ describe("API Routes", () => {
       phaseData: null,
       temperature: null,
       doorStatus: null,
-      ventilator: {
-        isOn: false,
-        delayEndTime: null,
-        keepAliveEndTime: null,
-      },
-      notifications: {
-        safetyShutdown: 0,
-        temperature: 0,
-      },
-      flic: {
-        lastPress: null,
-        lastPressTime: null,
-      },
+    });
+    vi.mocked(getVentilatorStatusSummary).mockReturnValue({
+      enabled: true,
+      status: false,
+      hasDelayedOffTimer: false,
+      delayedOffRemainingMs: 0,
+      keepAliveActive: false,
     });
     vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
     vi.mocked(getClientCount).mockReturnValue(0);
@@ -258,7 +253,11 @@ describe("API Routes", () => {
     test("returns error status when local API is unavailable", async () => {
       // Arrange
       vi.mocked(getMcbStatus).mockResolvedValue(
-        err({ type: "STATUS_UNAVAILABLE", message: "Connection refused", source: "local" })
+        err({
+          type: "STATUS_UNAVAILABLE",
+          message: "Connection refused",
+          source: "local",
+        }),
       );
 
       // Act
@@ -294,7 +293,11 @@ describe("API Routes", () => {
     test("returns error status when Tuya Cloud API fails", async () => {
       // Arrange
       vi.mocked(turnMcbOn).mockResolvedValue(
-        err({ type: "COMMAND_FAILED", message: "Tuya API timeout", command: "TURN_ON" })
+        err({
+          type: "COMMAND_FAILED",
+          message: "Tuya API timeout",
+          command: "TURN_ON",
+        }),
       );
 
       // Act
@@ -309,7 +312,7 @@ describe("API Routes", () => {
     test("returns error status when authentication fails", async () => {
       // Arrange
       vi.mocked(turnMcbOn).mockResolvedValue(
-        err({ type: "AUTH_FAILED", message: "Invalid access token" })
+        err({ type: "AUTH_FAILED", message: "Invalid access token" }),
       );
 
       // Act
@@ -345,7 +348,7 @@ describe("API Routes", () => {
     test("returns error status when command fails", async () => {
       // Arrange
       vi.mocked(turnMcbOff).mockResolvedValue(
-        err({ type: "NETWORK_ERROR", message: "Connection timeout" })
+        err({ type: "NETWORK_ERROR", message: "Connection timeout" }),
       );
 
       // Act
@@ -366,8 +369,11 @@ describe("API Routes", () => {
     test("returns ventilator state when enabled", async () => {
       // Arrange
       vi.mocked(getVentilatorStatusSummary).mockReturnValue({
-        isOn: true,
-        delayEndTime: Date.now() + 3600000,
+        enabled: true,
+        status: true,
+        hasDelayedOffTimer: true,
+        delayedOffRemainingMs: 3600000,
+        keepAliveActive: false,
       });
 
       // Act
@@ -377,6 +383,7 @@ describe("API Routes", () => {
       // Assert
       expect(res.status).toBe(200);
       expect(body.enabled).toBe(true);
+      expect(body.status).toBe(true);
       expect(body.requestId).toBe("test-request-id");
     });
 
@@ -431,7 +438,7 @@ describe("API Routes", () => {
     test("returns error when Shelly relay fails", async () => {
       // Arrange
       vi.mocked(controlShellyRelay).mockResolvedValue(
-        err({ type: "NETWORK_ERROR", message: "Connection timeout" })
+        err({ type: "NETWORK_ERROR", message: "Connection timeout" }),
       );
 
       // Act
@@ -460,7 +467,10 @@ describe("API Routes", () => {
       // Assert
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
-      expect(controlShellyRelay).toHaveBeenCalledWith(false, expect.any(Object));
+      expect(controlShellyRelay).toHaveBeenCalledWith(
+        false,
+        expect.any(Object),
+      );
     });
 
     test("returns error when ventilator not configured", async () => {
@@ -487,6 +497,9 @@ describe("API Routes", () => {
       vi.mocked(getLastTemperature).mockReturnValue({
         temperature: 85.5,
         humidity: 12,
+        pressure: null,
+        batteryVoltageMv: null,
+        rssi: null,
         lastUpdate: 1704326400000,
       });
 
@@ -572,8 +585,9 @@ describe("API Routes", () => {
       expect(res.status).toBe(200);
       expect(body.requestId).toBe("test-request-id");
       expect(body.mcbStatus).toBe("OFF");
-      expect(body).toHaveProperty("ventilator");
-      expect(body).toHaveProperty("notifications");
+      expect(body.phaseData).toBeNull();
+      expect(body.temperature).toBeNull();
+      expect(body.doorStatus).toBeNull();
     });
   });
 
@@ -620,7 +634,7 @@ describe("API Routes", () => {
       // Arrange
       vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
       vi.mocked(turnMcbOn).mockResolvedValue(
-        err({ type: "NETWORK_ERROR", message: "Connection failed" })
+        err({ type: "NETWORK_ERROR", message: "Connection failed" }),
       );
 
       // Act
@@ -655,7 +669,7 @@ describe("API Routes", () => {
     test("returns error when force ON fails", async () => {
       // Arrange
       vi.mocked(turnMcbOn).mockResolvedValue(
-        err({ type: "AUTH_FAILED", message: "Invalid token" })
+        err({ type: "AUTH_FAILED", message: "Invalid token" }),
       );
 
       // Act
@@ -690,7 +704,11 @@ describe("API Routes", () => {
     test("returns error when force OFF fails", async () => {
       // Arrange
       vi.mocked(turnMcbOff).mockResolvedValue(
-        err({ type: "COMMAND_FAILED", message: "Device offline" })
+        err({
+          type: "COMMAND_FAILED",
+          command: "TURN_OFF",
+          message: "Device offline",
+        }),
       );
 
       // Act
@@ -710,7 +728,7 @@ describe("API Routes", () => {
   describe("POST /api/test-waha", () => {
     test("sends test notification successfully", async () => {
       // Arrange
-      vi.mocked(sendCustomNotification).mockResolvedValue(ok(true));
+      vi.mocked(sendCustomNotification).mockResolvedValue(ok(undefined));
 
       // Act
       const res = await app.request("/api/test-waha", { method: "POST" });
@@ -721,7 +739,7 @@ describe("API Routes", () => {
       expect(body.success).toBe(true);
       expect(body.message).toBe("Test notification sent");
       expect(sendCustomNotification).toHaveBeenCalledWith(
-        "Test notification from Sauna Control System"
+        "Test notification from Sauna Control System",
       );
     });
 
@@ -742,7 +760,7 @@ describe("API Routes", () => {
     test("returns error when notification send fails", async () => {
       // Arrange
       vi.mocked(sendCustomNotification).mockResolvedValue(
-        err({ type: "SEND_FAILED", message: "WAHA server unreachable" })
+        err({ type: "SEND_FAILED", message: "WAHA server unreachable" }),
       );
 
       // Act
@@ -770,4 +788,3 @@ describe("API Routes", () => {
   // NOTE: Dashboard test requires full JSX rendering setup with all dependencies.
   // The dashboard component and its rendering are tested via manual browser testing.
 });
-

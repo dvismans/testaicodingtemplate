@@ -63,4 +63,3 @@ export const DEFAULT_FLIC_CONFIG: FlicActionConfig = {
   doubleClick: "off",
   hold: "on",
 };
-

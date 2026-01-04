@@ -31,17 +31,19 @@ export function formatTemperatureMessage(temp: number): string {
 /**
  * Format a safety shutdown notification message.
  */
-export function formatSafetyShutdownMessage(phases: ReadonlyArray<string>): string {
-  return (
-    "SAFETY ALERT: MCB automatically switched OFF due to high amperage detected on phase(s): " +
-    `${phases.join(", ")}. Please check your electrical load before manually switching back on.`
-  );
+export function formatSafetyShutdownMessage(
+  phases: ReadonlyArray<string>,
+): string {
+  return `SAFETY ALERT: MCB automatically switched OFF due to high amperage detected on phase(s): ${phases.join(", ")}. Please check your electrical load before manually switching back on.`;
 }
 
 /**
  * Format an MCB status notification message.
  */
-export function formatMcbStatusMessage(status: "on" | "off", reason?: string): string {
+export function formatMcbStatusMessage(
+  status: "on" | "off",
+  reason?: string,
+): string {
   const base = `MCB has been turned ${status.toUpperCase()}`;
   return reason ? `${base}: ${reason}` : base;
 }
@@ -175,7 +177,10 @@ export function createSystemAlertNotification(
  * @param now - Current timestamp in ms
  * @returns true if notification is allowed
  */
-export function isSafetyShutdownAllowed(state: CooldownState, now: number): boolean {
+export function isSafetyShutdownAllowed(
+  state: CooldownState,
+  now: number,
+): boolean {
   return now - state.safetyShutdown >= COOLDOWN_DURATIONS.safetyShutdown;
 }
 
@@ -186,7 +191,10 @@ export function isSafetyShutdownAllowed(state: CooldownState, now: number): bool
  * @param now - Current timestamp in ms
  * @returns true if notification is allowed
  */
-export function isTemperatureNotificationAllowed(state: CooldownState, now: number): boolean {
+export function isTemperatureNotificationAllowed(
+  state: CooldownState,
+  now: number,
+): boolean {
   return now - state.temperature >= COOLDOWN_DURATIONS.temperature;
 }
 
@@ -197,8 +205,12 @@ export function isTemperatureNotificationAllowed(state: CooldownState, now: numb
  * @param now - Current timestamp in ms
  * @returns Remaining milliseconds, or 0 if not in cooldown
  */
-export function getSafetyShutdownCooldownRemaining(state: CooldownState, now: number): number {
-  const remaining = COOLDOWN_DURATIONS.safetyShutdown - (now - state.safetyShutdown);
+export function getSafetyShutdownCooldownRemaining(
+  state: CooldownState,
+  now: number,
+): number {
+  const remaining =
+    COOLDOWN_DURATIONS.safetyShutdown - (now - state.safetyShutdown);
   return Math.max(0, remaining);
 }
 
@@ -209,7 +221,10 @@ export function getSafetyShutdownCooldownRemaining(state: CooldownState, now: nu
  * @param now - Current timestamp in ms
  * @returns Remaining milliseconds, or 0 if not in cooldown
  */
-export function getTemperatureCooldownRemaining(state: CooldownState, now: number): number {
+export function getTemperatureCooldownRemaining(
+  state: CooldownState,
+  now: number,
+): number {
   const remaining = COOLDOWN_DURATIONS.temperature - (now - state.temperature);
   return Math.max(0, remaining);
 }
@@ -217,14 +232,19 @@ export function getTemperatureCooldownRemaining(state: CooldownState, now: numbe
 /**
  * Update cooldown state after sending a safety shutdown notification.
  */
-export function updateSafetyShutdownCooldown(state: CooldownState, now: number): CooldownState {
+export function updateSafetyShutdownCooldown(
+  state: CooldownState,
+  now: number,
+): CooldownState {
   return { ...state, safetyShutdown: now };
 }
 
 /**
  * Update cooldown state after sending a temperature notification.
  */
-export function updateTemperatureCooldown(state: CooldownState, now: number): CooldownState {
+export function updateTemperatureCooldown(
+  state: CooldownState,
+  now: number,
+): CooldownState {
   return { ...state, temperature: now };
 }
-

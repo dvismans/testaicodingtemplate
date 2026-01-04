@@ -104,7 +104,6 @@ const StatusIndicators: FC = () => (
   </div>
 );
 
-
 /**
  * Dashboard props for initial server-side render.
  */

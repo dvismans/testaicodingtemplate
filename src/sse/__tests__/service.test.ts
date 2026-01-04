@@ -5,7 +5,7 @@
  *
  * @see TESTING.md - T1 (Test at Three Levels)
  */
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock logger
 vi.mock("../../logger.js", () => ({
@@ -19,17 +19,17 @@ vi.mock("../../logger.js", () => ({
 
 // Import after mocks
 import {
-  getClientCount,
-  createSseStream,
-  removeClient,
   broadcast,
+  broadcastDoor,
   broadcastMcbStatus,
   broadcastSensorData,
   broadcastTemperature,
-  broadcastDoor,
   broadcastVentilator,
-  sendToClient,
+  createSseStream,
   disconnectAllClients,
+  getClientCount,
+  removeClient,
+  sendToClient,
 } from "../service.js";
 
 describe("SSE Service", () => {
@@ -312,7 +312,11 @@ describe("SSE Service", () => {
       await reader2.read();
 
       // Send to client 1 only
-      const sent = sendToClient(id1, { type: "mcb_status", status: "ON", source: "command" });
+      const sent = sendToClient(id1, {
+        type: "mcb_status",
+        status: "ON",
+        source: "command",
+      });
       expect(sent).toBe(true);
 
       // Client 1 should receive the event
@@ -328,9 +332,12 @@ describe("SSE Service", () => {
     });
 
     test("returns false for non-existent client", () => {
-      const sent = sendToClient(99999, { type: "mcb_status", status: "ON", source: "command" });
+      const sent = sendToClient(99999, {
+        type: "mcb_status",
+        status: "ON",
+        source: "command",
+      });
       expect(sent).toBe(false);
     });
   });
 });
-

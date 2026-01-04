@@ -211,7 +211,11 @@ function parseJsonPayload(payload: unknown): Record<string, unknown> | null {
 
     const parsed = JSON.parse(str);
 
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       return null;
     }
 
@@ -224,7 +228,12 @@ function parseJsonPayload(payload: unknown): Record<string, unknown> | null {
 /**
  * Determine message type from MQTT topic.
  */
-export type MqttMessageType = "door" | "ruuvi" | "ventilator" | "flic" | "unknown";
+export type MqttMessageType =
+  | "door"
+  | "ruuvi"
+  | "ventilator"
+  | "flic"
+  | "unknown";
 
 /**
  * Determine the message type from MQTT topic path.

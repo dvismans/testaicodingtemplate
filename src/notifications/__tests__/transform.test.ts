@@ -32,15 +32,21 @@ import {
 
 describe("formatTemperatureMessage", () => {
   it("formats temperature with one decimal place", () => {
-    expect(formatTemperatureMessage(75.5)).toBe("Sauna temperature is now 75.5°C");
+    expect(formatTemperatureMessage(75.5)).toBe(
+      "Sauna temperature is now 75.5°C",
+    );
   });
 
   it("rounds to one decimal place", () => {
-    expect(formatTemperatureMessage(80.123)).toBe("Sauna temperature is now 80.1°C");
+    expect(formatTemperatureMessage(80.123)).toBe(
+      "Sauna temperature is now 80.1°C",
+    );
   });
 
   it("handles integer temperature", () => {
-    expect(formatTemperatureMessage(90)).toBe("Sauna temperature is now 90.0°C");
+    expect(formatTemperatureMessage(90)).toBe(
+      "Sauna temperature is now 90.0°C",
+    );
   });
 });
 
@@ -82,7 +88,9 @@ describe("formatMcbStatusMessage", () => {
 describe("formatNotificationMessage", () => {
   it("formats temperature notification", () => {
     const notification = createTemperatureNotification(85.5, Date.now());
-    expect(formatNotificationMessage(notification)).toBe("Sauna temperature is now 85.5°C");
+    expect(formatNotificationMessage(notification)).toBe(
+      "Sauna temperature is now 85.5°C",
+    );
   });
 
   it("formats safety shutdown notification", () => {
@@ -94,7 +102,9 @@ describe("formatNotificationMessage", () => {
 
   it("formats MCB status notification", () => {
     const notification = createMcbStatusNotification("on", Date.now());
-    expect(formatNotificationMessage(notification)).toBe("MCB has been turned ON");
+    expect(formatNotificationMessage(notification)).toBe(
+      "MCB has been turned ON",
+    );
   });
 
   it("formats system alert notification", () => {
@@ -103,7 +113,9 @@ describe("formatNotificationMessage", () => {
       message: "Test alert",
       timestamp: Date.now(),
     };
-    expect(formatNotificationMessage(notification)).toBe("System Alert: Test alert");
+    expect(formatNotificationMessage(notification)).toBe(
+      "System Alert: Test alert",
+    );
   });
 });
 
@@ -208,7 +220,9 @@ describe("createMcbStatusNotification", () => {
 
 describe("isSafetyShutdownAllowed", () => {
   it("returns true when no previous notification", () => {
-    expect(isSafetyShutdownAllowed(INITIAL_COOLDOWN_STATE, Date.now())).toBe(true);
+    expect(isSafetyShutdownAllowed(INITIAL_COOLDOWN_STATE, Date.now())).toBe(
+      true,
+    );
   });
 
   it("returns false during cooldown period", () => {
@@ -225,7 +239,9 @@ describe("isSafetyShutdownAllowed", () => {
 
 describe("isTemperatureNotificationAllowed", () => {
   it("returns true when no previous notification", () => {
-    expect(isTemperatureNotificationAllowed(INITIAL_COOLDOWN_STATE, Date.now())).toBe(true);
+    expect(
+      isTemperatureNotificationAllowed(INITIAL_COOLDOWN_STATE, Date.now()),
+    ).toBe(true);
   });
 
   it("returns false during cooldown period", () => {
@@ -242,7 +258,9 @@ describe("isTemperatureNotificationAllowed", () => {
 
 describe("getSafetyShutdownCooldownRemaining", () => {
   it("returns 0 when no cooldown active", () => {
-    expect(getSafetyShutdownCooldownRemaining(INITIAL_COOLDOWN_STATE, Date.now())).toBe(0);
+    expect(
+      getSafetyShutdownCooldownRemaining(INITIAL_COOLDOWN_STATE, Date.now()),
+    ).toBe(0);
   });
 
   it("returns remaining time during cooldown", () => {
@@ -263,7 +281,9 @@ describe("getSafetyShutdownCooldownRemaining", () => {
 
 describe("getTemperatureCooldownRemaining", () => {
   it("returns 0 when no cooldown active", () => {
-    expect(getTemperatureCooldownRemaining(INITIAL_COOLDOWN_STATE, Date.now())).toBe(0);
+    expect(
+      getTemperatureCooldownRemaining(INITIAL_COOLDOWN_STATE, Date.now()),
+    ).toBe(0);
   });
 
   it("returns remaining time during cooldown", () => {
@@ -295,4 +315,3 @@ describe("updateTemperatureCooldown", () => {
     expect(result.safetyShutdown).toBe(0); // Unchanged
   });
 });
-

@@ -6,13 +6,22 @@
  *
  * @see Rule #87 (Result Type for All Operations That Can Fail)
  */
-import { err, ok, type Result } from "neverthrow";
+import { type Result, err, ok } from "neverthrow";
 
 import { getNotificationConfig } from "../config.js";
 import { createLogger } from "../logger.js";
-import { networkError, notConfigured, rateLimited, sendFailed } from "./errors.js";
+import {
+  networkError,
+  notConfigured,
+  rateLimited,
+  sendFailed,
+} from "./errors.js";
 import type { NotificationError } from "./errors.js";
-import type { CooldownState, SafetyShutdownNotification, TemperatureNotification } from "./schema.js";
+import type {
+  CooldownState,
+  SafetyShutdownNotification,
+  TemperatureNotification,
+} from "./schema.js";
 import { INITIAL_COOLDOWN_STATE } from "./schema.js";
 import {
   buildWahaRequest,
@@ -65,7 +74,11 @@ export async function sendWhatsAppMessage(
   const wahaConfig = getNotificationConfig();
 
   if (!wahaConfig) {
-    return err(notConfigured("WhatsApp notifications not configured (WAHA_SERVER or NOTIFICATION_PHONE missing)"));
+    return err(
+      notConfigured(
+        "WhatsApp notifications not configured (WAHA_SERVER or NOTIFICATION_PHONE missing)",
+      ),
+    );
   }
 
   const chatId = phoneToWhatsAppId(wahaConfig.phoneNumber);
@@ -91,7 +104,12 @@ export async function sendWhatsAppMessage(
         { statusCode: response.status, error: errorText },
         "WAHA API request failed",
       );
-      return err(sendFailed(`WAHA API returned ${response.status}: ${errorText}`, response.status));
+      return err(
+        sendFailed(
+          `WAHA API returned ${response.status}: ${errorText}`,
+          response.status,
+        ),
+      );
     }
 
     log.info({ chatId }, "WhatsApp notification sent successfully");
@@ -99,7 +117,9 @@ export async function sendWhatsAppMessage(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     log.error({ error: message }, "Failed to send WhatsApp notification");
-    return err(networkError(message, error instanceof Error ? error : undefined));
+    return err(
+      networkError(message, error instanceof Error ? error : undefined),
+    );
   }
 }
 
@@ -165,7 +185,9 @@ export async function sendSafetyShutdownNotification(
       { remainingMs: remaining },
       "Safety shutdown notification rate limited",
     );
-    return err(rateLimited("Safety shutdown notification in cooldown", remaining));
+    return err(
+      rateLimited("Safety shutdown notification in cooldown", remaining),
+    );
   }
 
   const message = formatSafetyShutdownMessage(triggerPhases);
@@ -194,7 +216,9 @@ export async function sendSafetyShutdownNotification(
 export async function sendCustomNotification(
   message: string,
 ): Promise<Result<void, NotificationError>> {
-  log.debug({ messageLength: message.length }, "Sending custom notification...");
+  log.debug(
+    { messageLength: message.length },
+    "Sending custom notification...",
+  );
   return sendWhatsAppMessage(message);
 }
-

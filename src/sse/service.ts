@@ -53,19 +53,27 @@ export function createSseStream(): {
         connected: true,
       };
       clients.push(client);
-      log.info({ clientId, totalClients: getClientCount() }, "SSE client connected");
+      log.info(
+        { clientId, totalClients: getClientCount() },
+        "SSE client connected",
+      );
 
       // Send initial connection confirmation
       const encoder = new TextEncoder();
       controller.enqueue(
-        encoder.encode(`event: connected\ndata: ${JSON.stringify({ clientId })}\n\n`),
+        encoder.encode(
+          `event: connected\ndata: ${JSON.stringify({ clientId })}\n\n`,
+        ),
       );
     },
     cancel() {
       if (client) {
         client.connected = false;
         clients = clients.filter((c) => c.id !== clientId);
-        log.info({ clientId, remainingClients: getClientCount() }, "SSE client disconnected");
+        log.info(
+          { clientId, remainingClients: getClientCount() },
+          "SSE client disconnected",
+        );
       }
     },
   });
@@ -103,7 +111,9 @@ export function broadcast(event: SseEvent): void {
   }
 
   const encoder = new TextEncoder();
-  const data = encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  const data = encoder.encode(
+    `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
+  );
 
   let successCount = 0;
   let errorCount = 0;
@@ -128,7 +138,10 @@ export function broadcast(event: SseEvent): void {
     );
   }
 
-  log.debug({ eventType: event.type, clients: successCount }, "Event broadcasted");
+  log.debug(
+    { eventType: event.type, clients: successCount },
+    "Event broadcasted",
+  );
 }
 
 /**
@@ -155,7 +168,10 @@ export function broadcastSensorData(
 /**
  * Broadcast temperature update.
  */
-export function broadcastTemperature(temperature: number, humidity: number | null): void {
+export function broadcastTemperature(
+  temperature: number,
+  humidity: number | null,
+): void {
   broadcast({ type: "temperature", temperature, humidity });
 }
 
@@ -169,7 +185,10 @@ export function broadcastDoor(isOpen: boolean): void {
 /**
  * Broadcast ventilator status.
  */
-export function broadcastVentilator(status: boolean, delayedOffRemaining: number | null): void {
+export function broadcastVentilator(
+  status: boolean,
+  delayedOffRemaining: number | null,
+): void {
   broadcast({ type: "ventilator", status, delayedOffRemaining });
 }
 
@@ -183,7 +202,9 @@ export function sendToClient(clientId: number, event: SseEvent): boolean {
   try {
     const encoder = new TextEncoder();
     client.controller.enqueue(
-      encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`),
+      encoder.encode(
+        `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
+      ),
     );
     return true;
   } catch {
@@ -212,4 +233,3 @@ export function disconnectAllClients(): void {
 
   clients = [];
 }
-

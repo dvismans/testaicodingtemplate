@@ -6,7 +6,7 @@
  *
  * @see TESTING.md - T4 (Mock External Dependencies at Service Boundary)
  */
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock config before importing service
 vi.mock("../../config.js", () => ({
@@ -35,11 +35,11 @@ vi.mock("../../logger.js", () => ({
 
 // Import after mocks
 import {
+  clearTokenCache,
   getMcbStatus,
   sendMcbCommand,
-  turnMcbOn,
   turnMcbOff,
-  clearTokenCache,
+  turnMcbOn,
 } from "../service.js";
 
 describe("MCB Service", () => {
@@ -65,11 +65,14 @@ describe("MCB Service", () => {
 
     test("returns STATUS_UNAVAILABLE error when API returns 503", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: false,
-        status: 503,
-        statusText: "Service Unavailable",
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 503,
+          statusText: "Service Unavailable",
+        }),
+      );
 
       // Act
       const result = await getMcbStatus();
@@ -81,7 +84,10 @@ describe("MCB Service", () => {
 
     test("returns STATUS_UNAVAILABLE error when fetch throws", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Connection refused")));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new Error("Connection refused")),
+      );
 
       // Act
       const result = await getMcbStatus();
@@ -93,10 +99,13 @@ describe("MCB Service", () => {
 
     test("returns INVALID_RESPONSE error when response format is wrong", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ unexpected_field: "value" }),
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ unexpected_field: "value" }),
+        }),
+      );
 
       // Act
       const result = await getMcbStatus();
@@ -119,13 +128,17 @@ describe("MCB Service", () => {
 
     test("returns AUTH_FAILED when token request fails", async () => {
       // Arrange
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          success: false,
-          msg: "Invalid client credentials",
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: false,
+              msg: "Invalid client credentials",
+            }),
         }),
-      }));
+      );
 
       // Act
       const result = await turnMcbOn();
@@ -138,20 +151,24 @@ describe("MCB Service", () => {
     test("returns COMMAND_FAILED when network error occurs", async () => {
       // Arrange - First call (token) succeeds, second call (command) fails
       let callCount = 0;
-      vi.stubGlobal("fetch", vi.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              success: true,
-              result: { access_token: "test-token", expire_time: 7200 },
-            }),
-          });
-        }
-        // Command call fails
-        return Promise.reject(new Error("Network timeout"));
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  success: true,
+                  result: { access_token: "test-token", expire_time: 7200 },
+                }),
+            });
+          }
+          // Command call fails
+          return Promise.reject(new Error("Network timeout"));
+        }),
+      );
 
       // Act
       const result = await turnMcbOn();
@@ -162,4 +179,3 @@ describe("MCB Service", () => {
     });
   });
 });
-

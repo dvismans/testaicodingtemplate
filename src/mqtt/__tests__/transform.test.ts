@@ -315,7 +315,9 @@ describe("getMessageType", () => {
   });
 
   it("identifies ventilator topic", () => {
-    expect(getMessageType("homelab/sensors/sauna/ventilator/state")).toBe("ventilator");
+    expect(getMessageType("homelab/sensors/sauna/ventilator/state")).toBe(
+      "ventilator",
+    );
   });
 
   it("identifies flic topic", () => {
@@ -331,4 +333,3 @@ describe("getMessageType", () => {
     expect(getMessageType("homelab/sensors/sauna/Ruuvi/temp")).toBe("ruuvi");
   });
 });
-
