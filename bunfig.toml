@@ -1,0 +1,13 @@
+# Bun configuration
+# @see https://bun.sh/docs/runtime/bunfig
+
+[install]
+# Lockfile format
+lockfile = "bun"
+
+# JSX configuration - use Hono's JSX runtime
+# Note: Bun reads JSX config from tsconfig.json
+# This is a fallback for cases where tsconfig isn't found
+jsx = "react-jsx"
+jsxImportSource = "hono/jsx"
+
