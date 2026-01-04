@@ -1,0 +1,151 @@
+/**
+ * Sauna Control Dashboard Styles
+ * 
+ * Custom styles on top of Pico CSS.
+ */
+
+:root {
+  --pico-font-family-sans-serif: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --pico-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --sauna-hot: #ff6b35;
+  --sauna-warm: #f7c59f;
+  --sauna-cold: #2ec4b6;
+  --status-on: #22c55e;
+  --status-off: #ef4444;
+  --status-unknown: #eab308;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+/* Large temperature display */
+.temp-display {
+  font-size: 4rem;
+  font-weight: bold;
+  text-align: center;
+  color: var(--sauna-hot);
+  line-height: 1;
+}
+
+.temp-unit {
+  font-size: 2rem;
+  opacity: 0.7;
+}
+
+/* Phase amperage cards */
+.phase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.phase-card {
+  text-align: center;
+  padding: 1rem;
+  border-radius: var(--pico-border-radius);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.phase-card .value {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.phase-card .label {
+  font-size: 0.875rem;
+  opacity: 0.7;
+}
+
+.phase-danger {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--status-off);
+}
+
+/* Status indicators */
+.status-on {
+  color: var(--status-on);
+}
+
+.status-off {
+  color: var(--status-off);
+}
+
+.status-unknown {
+  color: var(--status-unknown);
+}
+
+/* MCB control button */
+.mcb-button {
+  font-size: 1.5rem;
+  padding: 1.5rem 3rem;
+  width: 100%;
+  max-width: 300px;
+  margin: 1rem auto;
+  display: block;
+}
+
+.mcb-button.on {
+  background: var(--status-off);
+}
+
+.mcb-button.off {
+  background: var(--status-on);
+}
+
+/* Door warning */
+.door-warning {
+  background: rgba(234, 179, 8, 0.2);
+  border: 1px solid var(--status-unknown);
+  padding: 0.5rem 1rem;
+  border-radius: var(--pico-border-radius);
+  text-align: center;
+}
+
+/* Connection status bar */
+.connection-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.25rem 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  z-index: 100;
+}
+
+.connection-bar.connected {
+  background: var(--status-on);
+  color: white;
+}
+
+.connection-bar.disconnected {
+  background: var(--status-off);
+  color: white;
+}
+
+/* Sensor age indicators */
+.sensor-age {
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+/* Ventilator countdown */
+.countdown {
+  font-family: monospace;
+  font-size: 1.25rem;
+}
+
+/* Footer version */
+footer {
+  margin-top: 2rem;
+  text-align: center;
+  opacity: 0.5;
+}
+
+/* Hide elements when SSE not connected */
+[data-sse-connected="false"] .sse-only {
+  opacity: 0.3;
+}
+

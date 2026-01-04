@@ -1,0 +1,47 @@
+/**
+ * MQTT Module - Public API
+ *
+ * Exports types, service functions, and transformations for the MQTT module.
+ *
+ * @see Rule #2 (Module Boundaries are Contracts)
+ */
+
+// Types
+export type {
+  DoorMessage,
+  FlicButtonEvent,
+  FlicMessage,
+  RuuviMessage,
+  SaunaDoorStatus,
+  SaunaTemperature,
+  SensorState,
+  VentilatorMqttMessage,
+  VentilatorMqttStatus,
+} from "./schema.js";
+
+export { INITIAL_SENSOR_STATE } from "./schema.js";
+
+// Service functions
+export {
+  disconnectMqttClient,
+  getLastDoorStatus,
+  getLastTemperature,
+  getLastVentilatorMqttStatus,
+  getSensorState,
+  initializeMqttClient,
+  isConnected,
+  updateEventHandlers,
+} from "./service.js";
+
+export type { MqttEventHandlers } from "./service.js";
+
+// Pure transformations (for testing)
+export type { MqttMessageType } from "./transform.js";
+
+export {
+  getMessageType,
+  parseDoorMessage,
+  parseFlicMessage,
+  parseRuuviMessage,
+  parseVentilatorMessage,
+} from "./transform.js";

@@ -1,7 +1,7 @@
 {
-  "name": "bun-hono-template",
+  "name": "sauna-control",
   "version": "1.0.0",
-  "description": "Bun + Hono + HTMX + Pico CSS template with typed config, logging, and error handling",
+  "description": "Sauna MCB control system with HTMX UI, SSE updates, MQTT sensors, and Tuya Cloud integration",
   "type": "module",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
@@ -20,6 +20,7 @@
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "hono": "^4.6.14",
+    "mqtt": "^5.14.1",
     "neverthrow": "^8.1.1",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
@@ -34,4 +35,3 @@
     "vitest": "^2.1.8"
   }
 }
-
