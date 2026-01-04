@@ -6,6 +6,7 @@
  *
  * @see Rule #5 (Pure Transformations), #8 (Immutability)
  */
+import { createHash, createHmac } from "node:crypto";
 import type {
   LocalMcbStatusResponse,
   McbCommand,
@@ -20,22 +21,18 @@ import type {
 
 /**
  * Generate SHA256 hash of content.
- * Uses Web Crypto API available in Bun.
+ * Uses Node's crypto module (compatible with Bun and Node.js).
  */
 export function sha256Hex(content: string): string {
-  const hasher = new Bun.CryptoHasher("sha256");
-  hasher.update(content);
-  return hasher.digest("hex");
+  return createHash("sha256").update(content).digest("hex");
 }
 
 /**
  * Generate HMAC-SHA256 signature.
- * Uses Web Crypto API available in Bun.
+ * Uses Node's crypto module (compatible with Bun and Node.js).
  */
 export function hmacSha256Hex(key: string, message: string): string {
-  const hmac = new Bun.CryptoHasher("sha256", key);
-  hmac.update(message);
-  return hmac.digest("hex").toUpperCase();
+  return createHmac("sha256", key).update(message).digest("hex").toUpperCase();
 }
 
 /**
