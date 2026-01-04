@@ -116,6 +116,13 @@ import { routes } from "../routes.js";
 import { getMcbStatus, turnMcbOn, turnMcbOff } from "../../mcb/index.js";
 import { sendCustomNotification } from "../../notifications/index.js";
 import { getClientCount } from "../../sse/index.js";
+import { getLastTemperature, getLastDoorStatus } from "../../mqtt/index.js";
+import { getSystemState, getCurrentMcbStatus } from "../../monitoring/index.js";
+import {
+  getVentilatorStatusSummary,
+  controlShellyRelay,
+} from "../../ventilator/index.js";
+import { getVentilatorConfig, getNotificationConfig } from "../../config.js";
 
 // Create a test app with the routes
 function createTestApp() {
@@ -135,12 +142,45 @@ describe("API Routes", () => {
   let app: Hono;
 
   beforeEach(() => {
-    app = createTestApp();
+    // Reset all mocks to their initial state
     vi.clearAllMocks();
-  });
 
-  afterEach(() => {
-    vi.resetAllMocks();
+    // Reset mock return values to defaults (defined in vi.mock factories above)
+    vi.mocked(getVentilatorConfig).mockReturnValue({
+      enabled: true,
+      ipAddress: "192.168.1.100",
+      delayOffMinutes: 60,
+      keepAliveMinutes: 25,
+      timeoutMs: 5000,
+    });
+    vi.mocked(getNotificationConfig).mockReturnValue({
+      serverUrl: "http://waha.test",
+      phoneNumber: "1234567890",
+    });
+    vi.mocked(getSystemState).mockReturnValue({
+      mcbStatus: "OFF",
+      phaseData: null,
+      temperature: null,
+      doorStatus: null,
+      ventilator: {
+        isOn: false,
+        delayEndTime: null,
+        keepAliveEndTime: null,
+      },
+      notifications: {
+        safetyShutdown: 0,
+        temperature: 0,
+      },
+      flic: {
+        lastPress: null,
+        lastPressTime: null,
+      },
+    });
+    vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
+    vi.mocked(getClientCount).mockReturnValue(0);
+
+    // Create fresh app instance
+    app = createTestApp();
   });
 
   // ===========================================================================
@@ -319,11 +359,402 @@ describe("API Routes", () => {
   });
 
   // ===========================================================================
-  // Notifications
+  // Ventilator Status
   // ===========================================================================
 
-  // NOTE: Notification endpoint tests require complex mock setup.
-  // The notification service is tested separately in notifications/__tests__/service.test.ts
+  describe("GET /api/ventilator/status", () => {
+    test("returns ventilator state when enabled", async () => {
+      // Arrange
+      vi.mocked(getVentilatorStatusSummary).mockReturnValue({
+        isOn: true,
+        delayEndTime: Date.now() + 3600000,
+      });
+
+      // Act
+      const res = await app.request("/api/ventilator/status");
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.enabled).toBe(true);
+      expect(body.requestId).toBe("test-request-id");
+    });
+
+    test("returns disabled message when ventilator not configured", async () => {
+      // Arrange
+      vi.mocked(getVentilatorConfig).mockReturnValue(null);
+
+      // Act
+      const res = await app.request("/api/ventilator/status");
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.enabled).toBe(false);
+      expect(body.message).toBe("Ventilator control is disabled");
+    });
+  });
+
+  // ===========================================================================
+  // Ventilator Control - Turn ON
+  // ===========================================================================
+
+  describe("POST /api/ventilator/on", () => {
+    test("returns success when ventilator turns on", async () => {
+      // Arrange
+      vi.mocked(controlShellyRelay).mockResolvedValue(ok(true));
+
+      // Act
+      const res = await app.request("/api/ventilator/on", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(controlShellyRelay).toHaveBeenCalledWith(true, expect.any(Object));
+    });
+
+    test("returns error when ventilator not configured", async () => {
+      // Arrange
+      vi.mocked(getVentilatorConfig).mockReturnValue(null);
+
+      // Act
+      const res = await app.request("/api/ventilator/on", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(body.error).toBe("Ventilator not configured");
+    });
+
+    test("returns error when Shelly relay fails", async () => {
+      // Arrange
+      vi.mocked(controlShellyRelay).mockResolvedValue(
+        err({ type: "NETWORK_ERROR", message: "Connection timeout" })
+      );
+
+      // Act
+      const res = await app.request("/api/ventilator/on", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(body.success).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // Ventilator Control - Turn OFF
+  // ===========================================================================
+
+  describe("POST /api/ventilator/off", () => {
+    test("returns success when ventilator turns off", async () => {
+      // Arrange
+      vi.mocked(controlShellyRelay).mockResolvedValue(ok(true));
+
+      // Act
+      const res = await app.request("/api/ventilator/off", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(controlShellyRelay).toHaveBeenCalledWith(false, expect.any(Object));
+    });
+
+    test("returns error when ventilator not configured", async () => {
+      // Arrange
+      vi.mocked(getVentilatorConfig).mockReturnValue(null);
+
+      // Act
+      const res = await app.request("/api/ventilator/off", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(body.success).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // Sensor Data - Temperature
+  // ===========================================================================
+
+  describe("GET /api/sauna-temp", () => {
+    test("returns temperature data when available", async () => {
+      // Arrange
+      vi.mocked(getLastTemperature).mockReturnValue({
+        temperature: 85.5,
+        humidity: 12,
+        lastUpdate: 1704326400000,
+      });
+
+      // Act
+      const res = await app.request("/api/sauna-temp");
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.temperature).toBe(85.5);
+      expect(body.humidity).toBe(12);
+      expect(body.lastUpdate).toBe(1704326400000);
+    });
+
+    test("returns null values when no temperature data", async () => {
+      // Arrange
+      vi.mocked(getLastTemperature).mockReturnValue(null);
+
+      // Act
+      const res = await app.request("/api/sauna-temp");
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.temperature).toBeNull();
+      expect(body.humidity).toBeNull();
+      expect(body.lastUpdate).toBeNull();
+    });
+  });
+
+  // ===========================================================================
+  // Sensor Data - Door Status
+  // ===========================================================================
+
+  describe("GET /api/door-status", () => {
+    test("returns door status when available", async () => {
+      // Arrange
+      vi.mocked(getLastDoorStatus).mockReturnValue({
+        isOpen: false,
+        batteryPercent: 87,
+        lastUpdate: 1704326400000,
+      });
+
+      // Act
+      const res = await app.request("/api/door-status");
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.isOpen).toBe(false);
+      expect(body.batteryPercent).toBe(87);
+      expect(body.lastUpdate).toBe(1704326400000);
+    });
+
+    test("returns null values when no door data", async () => {
+      // Arrange
+      vi.mocked(getLastDoorStatus).mockReturnValue(null);
+
+      // Act
+      const res = await app.request("/api/door-status");
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.isOpen).toBeNull();
+      expect(body.lastUpdate).toBeNull();
+    });
+  });
+
+  // ===========================================================================
+  // System State
+  // ===========================================================================
+
+  describe("GET /api/state", () => {
+    test("returns full system state", async () => {
+      // Arrange - using default mock from beforeEach
+
+      // Act
+      const res = await app.request("/api/state");
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.requestId).toBe("test-request-id");
+      expect(body.mcbStatus).toBe("OFF");
+      expect(body).toHaveProperty("ventilator");
+      expect(body).toHaveProperty("notifications");
+    });
+  });
+
+  // ===========================================================================
+  // Flic Button - Toggle
+  // ===========================================================================
+
+  describe("POST /api/flic/toggle", () => {
+    test("turns MCB ON when currently OFF", async () => {
+      // Arrange
+      vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
+      vi.mocked(turnMcbOn).mockResolvedValue(ok(true));
+
+      // Act
+      const res = await app.request("/api/flic/toggle", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.status).toBe("ON");
+      expect(turnMcbOn).toHaveBeenCalledTimes(1);
+      expect(turnMcbOff).not.toHaveBeenCalled();
+    });
+
+    test("turns MCB OFF when currently ON", async () => {
+      // Arrange
+      vi.mocked(getCurrentMcbStatus).mockReturnValue("ON");
+      vi.mocked(turnMcbOff).mockResolvedValue(ok(true));
+
+      // Act
+      const res = await app.request("/api/flic/toggle", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.status).toBe("OFF");
+      expect(turnMcbOff).toHaveBeenCalledTimes(1);
+      expect(turnMcbOn).not.toHaveBeenCalled();
+    });
+
+    test("returns error when toggle fails", async () => {
+      // Arrange
+      vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
+      vi.mocked(turnMcbOn).mockResolvedValue(
+        err({ type: "NETWORK_ERROR", message: "Connection failed" })
+      );
+
+      // Act
+      const res = await app.request("/api/flic/toggle", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(body.success).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // Flic Button - Force ON
+  // ===========================================================================
+
+  describe("POST /api/flic/on", () => {
+    test("forces MCB ON", async () => {
+      // Arrange
+      vi.mocked(turnMcbOn).mockResolvedValue(ok(true));
+
+      // Act
+      const res = await app.request("/api/flic/on", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.status).toBe("ON");
+    });
+
+    test("returns error when force ON fails", async () => {
+      // Arrange
+      vi.mocked(turnMcbOn).mockResolvedValue(
+        err({ type: "AUTH_FAILED", message: "Invalid token" })
+      );
+
+      // Act
+      const res = await app.request("/api/flic/on", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(body.success).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // Flic Button - Force OFF
+  // ===========================================================================
+
+  describe("POST /api/flic/off", () => {
+    test("forces MCB OFF", async () => {
+      // Arrange
+      vi.mocked(turnMcbOff).mockResolvedValue(ok(true));
+
+      // Act
+      const res = await app.request("/api/flic/off", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.status).toBe("OFF");
+    });
+
+    test("returns error when force OFF fails", async () => {
+      // Arrange
+      vi.mocked(turnMcbOff).mockResolvedValue(
+        err({ type: "COMMAND_FAILED", message: "Device offline" })
+      );
+
+      // Act
+      const res = await app.request("/api/flic/off", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(body.success).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // Notifications - Test WAHA
+  // ===========================================================================
+
+  describe("POST /api/test-waha", () => {
+    test("sends test notification successfully", async () => {
+      // Arrange
+      vi.mocked(sendCustomNotification).mockResolvedValue(ok(true));
+
+      // Act
+      const res = await app.request("/api/test-waha", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.message).toBe("Test notification sent");
+      expect(sendCustomNotification).toHaveBeenCalledWith(
+        "Test notification from Sauna Control System"
+      );
+    });
+
+    test("returns error when notifications not configured", async () => {
+      // Arrange
+      vi.mocked(getNotificationConfig).mockReturnValue(null);
+
+      // Act
+      const res = await app.request("/api/test-waha", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(body.error).toBe("Notifications are not configured");
+    });
+
+    test("returns error when notification send fails", async () => {
+      // Arrange
+      vi.mocked(sendCustomNotification).mockResolvedValue(
+        err({ type: "SEND_FAILED", message: "WAHA server unreachable" })
+      );
+
+      // Act
+      const res = await app.request("/api/test-waha", { method: "POST" });
+      const body = await res.json();
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(body.success).toBe(false);
+      expect(body.error).toBe("WAHA server unreachable");
+    });
+  });
 
   // ===========================================================================
   // SSE Events Endpoint
