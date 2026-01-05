@@ -58,6 +58,17 @@ export type VentilatorEvent = Readonly<{
 }>;
 
 /**
+ * Floor heating status event.
+ */
+export type FloorHeatingEvent = Readonly<{
+  type: "floor_heating";
+  currentTemp: number;
+  targetTemp: number;
+  mode: "AUTO" | "MANUAL" | "unknown";
+  action: "heating" | "warming" | "idle" | "unknown";
+}>;
+
+/**
  * Connection status event.
  */
 export type ConnectionEvent = Readonly<{
@@ -86,5 +97,6 @@ export type SseEvent =
   | TemperatureEvent
   | DoorEvent
   | VentilatorEvent
+  | FloorHeatingEvent
   | ConnectionEvent
   | SystemStateEvent;

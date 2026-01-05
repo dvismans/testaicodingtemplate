@@ -193,6 +193,18 @@ export function broadcastVentilator(
 }
 
 /**
+ * Broadcast floor heating status.
+ */
+export function broadcastFloorHeating(
+  currentTemp: number,
+  targetTemp: number,
+  mode: "AUTO" | "MANUAL" | "unknown",
+  action: "heating" | "warming" | "idle" | "unknown",
+): void {
+  broadcast({ type: "floor_heating", currentTemp, targetTemp, mode, action });
+}
+
+/**
  * Send event to a specific client.
  */
 export function sendToClient(clientId: number, event: SseEvent): boolean {

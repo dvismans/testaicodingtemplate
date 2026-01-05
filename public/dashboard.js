@@ -22,6 +22,7 @@
     door: null,
     ventilator: null,
     phase: null,
+    floorHeating: null,
   };
 
   // Cached sensor values for display
@@ -32,6 +33,7 @@
     doorBattery: null,
     ventilatorOn: null,
     phase: { l1: null, l2: null, l3: null },
+    floorHeating: { currentTemp: null, targetTemp: null, action: null },
   };
 
   // ==========================================================================
@@ -47,6 +49,7 @@
   var phaseAge = document.getElementById("phase-age");
   var doorStatus = document.getElementById("door-status");
   var ventilatorStatus = document.getElementById("ventilator-status");
+  var floorHeatingStatus = document.getElementById("floor-heating-status");
 
   // ==========================================================================
   // Time Formatting
@@ -212,6 +215,28 @@
       "<small>Ventilator: " + status + ageStr + "</small>";
   }
 
+  function updateFloorHeatingDisplay() {
+    if (!floorHeatingStatus) return;
+    var age = getAgeSeconds(timestamps.floorHeating);
+
+    if (sensorData.floorHeating.currentTemp === null) {
+      floorHeatingStatus.innerHTML =
+        "<small>Floor heating unavailable</small>";
+      return;
+    }
+
+    var temp = sensorData.floorHeating.currentTemp.toFixed(1);
+    var target = sensorData.floorHeating.targetTemp;
+    var action = sensorData.floorHeating.action;
+    var ageStr = age !== null ? " · " + formatAge(age) : "";
+
+    // Show action indicator
+    var actionIcon = action === "heating" ? "🔥" : (action === "warming" ? "♨️" : "");
+    
+    floorHeatingStatus.innerHTML =
+      "<small>Floor: " + temp + "°C → " + target + "°C " + actionIcon + ageStr + "</small>";
+  }
+
   /**
    * Update all age displays (called every second).
    */
@@ -220,6 +245,7 @@
     updatePhaseAge();
     updateDoorDisplay();
     updateVentilatorDisplay();
+    updateFloorHeatingDisplay();
   }
 
   // ==========================================================================
@@ -262,6 +288,15 @@
     timestamps.ventilator = Date.now();
 
     updateVentilatorDisplay();
+  }
+
+  function handleFloorHeating(data) {
+    sensorData.floorHeating.currentTemp = data.currentTemp;
+    sensorData.floorHeating.targetTemp = data.targetTemp;
+    sensorData.floorHeating.action = data.action;
+    timestamps.floorHeating = Date.now();
+
+    updateFloorHeatingDisplay();
   }
 
   // ==========================================================================
@@ -309,6 +344,11 @@
     eventSource.addEventListener("ventilator", function (e) {
       var data = JSON.parse(e.data);
       handleVentilator(data);
+    });
+
+    eventSource.addEventListener("floor_heating", function (e) {
+      var data = JSON.parse(e.data);
+      handleFloorHeating(data);
     });
 
     eventSource.addEventListener("heartbeat", function (e) {

@@ -11,6 +11,7 @@ import TuyAPI from "tuyapi";
 
 import { getFloorHeatingConfig } from "../config.js";
 import { createLogger } from "../logger.js";
+import { broadcastFloorHeating } from "../sse/index.js";
 import {
   type FloorHeatingError,
   connectionFailed,
@@ -239,6 +240,9 @@ function handleStatusUpdate(dps: FloorHeatingDps): void {
     },
     "Floor heating status update",
   );
+
+  // Broadcast to SSE clients
+  broadcastFloorHeating(currentTemp, targetTemp, mode, action);
 }
 
 // =============================================================================

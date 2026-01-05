@@ -87,7 +87,7 @@ const TemperatureCard: FC = () => (
 );
 
 /**
- * Status indicators (door, ventilator).
+ * Status indicators (door, ventilator, floor heating).
  */
 const StatusIndicators: FC = () => (
   <div class="grid">
@@ -99,6 +99,11 @@ const StatusIndicators: FC = () => (
     <div id="ventilator-status" style={{ textAlign: "center" }}>
       <small style={{ color: "var(--muted-color)" }}>
         Ventilator status unavailable
+      </small>
+    </div>
+    <div id="floor-heating-status" style={{ textAlign: "center" }}>
+      <small style={{ color: "var(--muted-color)" }}>
+        Floor heating unavailable
       </small>
     </div>
   </div>

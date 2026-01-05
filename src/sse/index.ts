@@ -10,6 +10,7 @@
 export type {
   ConnectionEvent,
   DoorEvent,
+  FloorHeatingEvent,
   McbStatusEvent,
   SensorDataEvent,
   SseEvent,
@@ -22,6 +23,7 @@ export type {
 export {
   broadcast,
   broadcastDoor,
+  broadcastFloorHeating,
   broadcastMcbStatus,
   broadcastSensorData,
   broadcastTemperature,
