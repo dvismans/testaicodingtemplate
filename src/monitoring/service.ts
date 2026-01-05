@@ -6,14 +6,23 @@
  *
  * @see Rule #27 (Module-Scoped Color-Coded Loggers)
  */
-import { config, getVentilatorConfig } from "../config.js";
+import {
+  config,
+  getFloorHeatingConfig,
+  getVentilatorConfig,
+} from "../config.js";
+import {
+  connectFloorHeating,
+  disconnectFloorHeating,
+  setFloorHeatingOff,
+  setFloorHeatingOn,
+} from "../floor-heating/index.js";
 import {
   createLogger,
   logOperationComplete,
   logOperationFailed,
   logOperationStart,
 } from "../logger.js";
-import type { McbStatus } from "../mcb/index.js";
 import {
   type McbLocalStatus,
   connectMcbLocal,
@@ -22,6 +31,7 @@ import {
   turnMcbOffLocal,
   turnMcbOnLocal,
 } from "../mcb-local/index.js";
+import type { McbStatus } from "../mcb/index.js";
 import {
   type FlicButtonEvent,
   type MqttPhaseData,
@@ -124,6 +134,9 @@ async function triggerSafetyShutdown(triggerPhases: string[]): Promise<void> {
       await handleMcbOffVentilator();
     }
 
+    // Turn off floor heating
+    await handleMcbOffFloorHeating();
+
     // Send notification (respects cooldown)
     await sendSafetyShutdownNotification(triggerPhases);
   } else {
@@ -153,6 +166,50 @@ async function handleMcbOffVentilator(): Promise<void> {
       "Ventilator scheduled for delayed shutdown",
     );
     broadcastVentilator(true, ventConfig.delayOffMinutes * 60 * 1000);
+  }
+}
+
+/**
+ * Handle floor heating when MCB turns ON.
+ * Sets floor heating to target temperature.
+ */
+async function handleMcbOnFloorHeating(): Promise<void> {
+  const floorConfig = getFloorHeatingConfig();
+  if (!floorConfig) return;
+
+  log.info(
+    { targetTemp: floorConfig.targetTempOn },
+    "Setting floor heating ON with sauna...",
+  );
+
+  const result = await setFloorHeatingOn();
+  if (result.isErr()) {
+    log.error(
+      { error: result.error.message },
+      "Failed to set floor heating ON",
+    );
+  }
+}
+
+/**
+ * Handle floor heating when MCB turns OFF.
+ * Sets floor heating to minimum (standby).
+ */
+async function handleMcbOffFloorHeating(): Promise<void> {
+  const floorConfig = getFloorHeatingConfig();
+  if (!floorConfig) return;
+
+  log.info(
+    { targetTemp: floorConfig.targetTempOff },
+    "Setting floor heating OFF with sauna...",
+  );
+
+  const result = await setFloorHeatingOff();
+  if (result.isErr()) {
+    log.error(
+      { error: result.error.message },
+      "Failed to set floor heating OFF",
+    );
   }
 }
 
@@ -202,12 +259,29 @@ async function handleFlicEvent(event: FlicButtonEvent): Promise<void> {
     if (result.isOk()) {
       state = { ...state, mcbStatus: "ON" };
       broadcastMcbStatus("ON", "flic");
+      // Turn on floor heating
+      handleMcbOnFloorHeating().catch((err) => {
+        log.error(
+          { error: err },
+          "Failed to handle MCB on floor heating (Flic)",
+        );
+      });
     }
   } else {
     const result = await turnMcbOffLocal();
     if (result.isOk()) {
       state = { ...state, mcbStatus: "OFF" };
       broadcastMcbStatus("OFF", "flic");
+      // Start ventilator delayed-off and turn off floor heating
+      handleMcbOffVentilator().catch((err) => {
+        log.error({ error: err }, "Failed to handle MCB off ventilator (Flic)");
+      });
+      handleMcbOffFloorHeating().catch((err) => {
+        log.error(
+          { error: err },
+          "Failed to handle MCB off floor heating (Flic)",
+        );
+      });
     }
   }
 }
@@ -256,10 +330,17 @@ function handleMcbLocalUpdate(data: McbLocalStatus): void {
     state = { ...state, mcbStatus: newStatus };
     broadcastMcbStatus(newStatus, "mqtt"); // Keep "mqtt" source for compatibility
 
-    // Handle ventilator control when MCB turns off
+    // Handle ventilator and floor heating when MCB status changes
     if (newStatus === "OFF" && previousStatus === "ON") {
       handleMcbOffVentilator().catch((err) => {
         log.error({ error: err }, "Failed to handle MCB off ventilator");
+      });
+      handleMcbOffFloorHeating().catch((err) => {
+        log.error({ error: err }, "Failed to handle MCB off floor heating");
+      });
+    } else if (newStatus === "ON" && previousStatus === "OFF") {
+      handleMcbOnFloorHeating().catch((err) => {
+        log.error({ error: err }, "Failed to handle MCB on floor heating");
       });
     }
   }
@@ -322,6 +403,18 @@ export async function startMonitoringLoop(): Promise<void> {
     );
   }
 
+  // Connect to floor heating if configured
+  const floorConfig = getFloorHeatingConfig();
+  if (floorConfig) {
+    const floorResult = await connectFloorHeating();
+    if (floorResult.isErr()) {
+      log.error(
+        { error: floorResult.error.message },
+        "Failed to connect to floor heating - continuing without floor heating control",
+      );
+    }
+  }
+
   // Initialize MQTT with event handlers (sensors only, MCB status from local)
   initializeMqttClient({
     onTemperature: (data: SaunaTemperature) => {
@@ -379,6 +472,7 @@ export function stopMonitoringLoop(): void {
   log.info("Stopping monitoring loop...");
   stopRequested = true;
   disconnectMcbLocal();
+  disconnectFloorHeating();
   disconnectMqttClient();
 }
 

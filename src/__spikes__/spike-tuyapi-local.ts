@@ -103,7 +103,9 @@ async function testLocalMcbConnection(): Promise<void> {
     await device.set({ dps: 1, set: true });
     */
 
-    console.log("\n5. Keeping connection open for 5 seconds to receive updates...");
+    console.log(
+      "\n5. Keeping connection open for 5 seconds to receive updates...",
+    );
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     // Disconnect
@@ -126,4 +128,3 @@ testLocalMcbConnection()
     console.error("Fatal error:", err);
     process.exit(1);
   });
-

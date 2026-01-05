@@ -188,6 +188,35 @@ const ConfigSchema = z.object({
     .describe("Phone number for notifications (WhatsApp format)"),
 
   // ==========================================================================
+  // Floor Heating (Tuya Thermostat) Configuration
+  // ==========================================================================
+  FLOOR_HEATING_ENABLED: envBoolean(false).describe(
+    "Enable/disable floor heating control when sauna turns on/off",
+  ),
+  FLOOR_HEATING_DEVICE_ID: z
+    .string()
+    .optional()
+    .describe("Tuya device ID for floor heating thermostat"),
+  FLOOR_HEATING_LOCAL_KEY: z
+    .string()
+    .optional()
+    .describe("Tuya local key for floor heating thermostat"),
+  FLOOR_HEATING_PROTOCOL_VERSION: z
+    .string()
+    .default("3.3")
+    .describe("Tuya protocol version for floor heating"),
+  FLOOR_HEATING_TARGET_TEMP_ON: z.coerce
+    .number()
+    .positive()
+    .default(21)
+    .describe("Target temperature (°C) when sauna is ON"),
+  FLOOR_HEATING_TARGET_TEMP_OFF: z.coerce
+    .number()
+    .nonnegative()
+    .default(5)
+    .describe("Target temperature (°C) when sauna is OFF (minimum/standby)"),
+
+  // ==========================================================================
   // Feature Flags
   // ==========================================================================
   ENABLE_SAFETY_SHUTDOWN: envBoolean(true).describe(
@@ -294,3 +323,33 @@ export const mqttTopics = {
   phase: config.MQTT_TOPIC_PHASE,
   mcb: config.MQTT_TOPIC_MCB,
 } as const;
+
+/**
+ * Floor heating configuration for tuyapi.
+ * Returns null if floor heating is disabled or not configured.
+ */
+export function getFloorHeatingConfig(): Readonly<{
+  enabled: true;
+  deviceId: string;
+  localKey: string;
+  protocolVersion: string;
+  targetTempOn: number;
+  targetTempOff: number;
+}> | null {
+  if (
+    !config.FLOOR_HEATING_ENABLED ||
+    !config.FLOOR_HEATING_DEVICE_ID ||
+    !config.FLOOR_HEATING_LOCAL_KEY
+  ) {
+    return null;
+  }
+
+  return {
+    enabled: true,
+    deviceId: config.FLOOR_HEATING_DEVICE_ID,
+    localKey: config.FLOOR_HEATING_LOCAL_KEY,
+    protocolVersion: config.FLOOR_HEATING_PROTOCOL_VERSION,
+    targetTempOn: config.FLOOR_HEATING_TARGET_TEMP_ON,
+    targetTempOff: config.FLOOR_HEATING_TARGET_TEMP_OFF,
+  };
+}

@@ -20,7 +20,10 @@ export type McbLocalError =
 // Error Factory Functions
 // =============================================================================
 
-export function connectionFailed(message: string, cause?: Error): McbLocalError {
+export function connectionFailed(
+  message: string,
+  cause?: Error,
+): McbLocalError {
   return cause !== undefined
     ? { type: "CONNECTION_FAILED", message, cause }
     : { type: "CONNECTION_FAILED", message };
@@ -37,7 +40,10 @@ export function statusUnavailable(message: string): McbLocalError {
   return { type: "STATUS_UNAVAILABLE", message };
 }
 
-export function deviceError(message: string, deviceError: string): McbLocalError {
+export function deviceError(
+  message: string,
+  deviceError: string,
+): McbLocalError {
   return { type: "DEVICE_ERROR", message, deviceError };
 }
 
@@ -62,4 +68,3 @@ export function formatMcbLocalError(error: McbLocalError): string {
       return `Timeout after ${error.timeoutMs}ms: ${error.message}`;
   }
 }
-

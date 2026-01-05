@@ -117,8 +117,8 @@ vi.mock("../../logger.js", () => ({
 // Now import the modules (after mocks are set up)
 import { err, ok } from "neverthrow";
 import { getNotificationConfig, getVentilatorConfig } from "../../config.js";
-import { getMcbStatus } from "../../mcb/index.js";
 import { turnMcbOffLocal, turnMcbOnLocal } from "../../mcb-local/index.js";
+import { getMcbStatus } from "../../mcb/index.js";
 import { getCurrentMcbStatus, getSystemState } from "../../monitoring/index.js";
 import { getLastDoorStatus, getLastTemperature } from "../../mqtt/index.js";
 import { sendCustomNotification } from "../../notifications/index.js";

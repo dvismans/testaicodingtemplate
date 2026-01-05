@@ -6,16 +6,16 @@
  *
  * @see Rule #5 (Pure Transformations at edges)
  */
-import { err, ok, type Result } from "neverthrow";
+import { type Result, err, ok } from "neverthrow";
 import TuyAPI from "tuyapi";
 
 import { getMcbLocalConfig } from "../config.js";
 import { createLogger } from "../logger.js";
 import {
+  type McbLocalError,
   commandFailed,
   connectionFailed,
   deviceError,
-  type McbLocalError,
   statusUnavailable,
   timeout,
 } from "./errors.js";
@@ -133,10 +133,7 @@ export async function connectMcbLocal(
     state = { ...state, connectionState: "error", lastError: message };
     log.error({ error: message }, "Failed to connect to MCB locally");
     return err(
-      connectionFailed(
-        message,
-        error instanceof Error ? error : undefined,
-      ),
+      connectionFailed(message, error instanceof Error ? error : undefined),
     );
   }
 }
@@ -302,7 +299,9 @@ export async function turnMcbOnLocal(): Promise<Result<true, McbLocalError>> {
 
     // Check for device-level error
     if (typeof error === "object" && error !== null && "Error" in error) {
-      return err(deviceError(message, String((error as { Error: unknown }).Error)));
+      return err(
+        deviceError(message, String((error as { Error: unknown }).Error)),
+      );
     }
 
     log.error({ error: message }, "Failed to turn MCB ON");
@@ -335,7 +334,9 @@ export async function turnMcbOffLocal(): Promise<Result<true, McbLocalError>> {
     const message = error instanceof Error ? error.message : String(error);
 
     if (typeof error === "object" && error !== null && "Error" in error) {
-      return err(deviceError(message, String((error as { Error: unknown }).Error)));
+      return err(
+        deviceError(message, String((error as { Error: unknown }).Error)),
+      );
     }
 
     log.error({ error: message }, "Failed to turn MCB OFF");
@@ -392,4 +393,3 @@ async function waitForStatus(
 
   return state.lastStatus?.isOn === expectedOn;
 }
-

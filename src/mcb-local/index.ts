@@ -40,4 +40,3 @@ export {
   turnMcbOffLocal,
   turnMcbOnLocal,
 } from "./service.js";
-

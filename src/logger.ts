@@ -22,6 +22,7 @@ const MODULE_COLORS: Record<string, string> = {
   mcb: "\x1b[36m", // cyan
   meter: "\x1b[35m", // magenta
   ventilator: "\x1b[32m", // green
+  heating: "\x1b[93m", // bright yellow
 
   // Communication modules
   mqtt: "\x1b[91m", // bright red

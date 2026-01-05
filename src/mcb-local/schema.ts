@@ -84,4 +84,3 @@ export const INITIAL_MCB_LOCAL_STATE: McbLocalState = {
   lastStatus: null,
   lastError: null,
 };
-

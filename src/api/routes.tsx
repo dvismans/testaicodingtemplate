@@ -19,12 +19,12 @@ import {
   getVentilatorConfig,
 } from "../config.js";
 import { createLogger } from "../logger.js";
-import { formatMcbError, getMcbStatus } from "../mcb/index.js";
 import {
   formatMcbLocalError,
   turnMcbOffLocal,
   turnMcbOnLocal,
 } from "../mcb-local/index.js";
+import { formatMcbError, getMcbStatus } from "../mcb/index.js";
 import { getCurrentMcbStatus, getSystemState } from "../monitoring/index.js";
 import { getLastDoorStatus, getLastTemperature } from "../mqtt/index.js";
 import { sendCustomNotification } from "../notifications/index.js";
@@ -374,7 +374,10 @@ routes.post("/api/flic/toggle", async (c) => {
   const result = targetOn ? await turnMcbOnLocal() : await turnMcbOffLocal();
 
   if (result.isErr()) {
-    return c.json({ success: false, error: formatMcbLocalError(result.error) }, 500);
+    return c.json(
+      { success: false, error: formatMcbLocalError(result.error) },
+      500,
+    );
   }
 
   broadcastMcbStatus(targetOn ? "ON" : "OFF", "flic");
@@ -395,7 +398,10 @@ routes.post("/api/flic/on", async (c) => {
   const result = await turnMcbOnLocal();
 
   if (result.isErr()) {
-    return c.json({ success: false, error: formatMcbLocalError(result.error) }, 500);
+    return c.json(
+      { success: false, error: formatMcbLocalError(result.error) },
+      500,
+    );
   }
 
   broadcastMcbStatus("ON", "flic");
@@ -412,7 +418,10 @@ routes.post("/api/flic/off", async (c) => {
   const result = await turnMcbOffLocal();
 
   if (result.isErr()) {
-    return c.json({ success: false, error: formatMcbLocalError(result.error) }, 500);
+    return c.json(
+      { success: false, error: formatMcbLocalError(result.error) },
+      500,
+    );
   }
 
   broadcastMcbStatus("OFF", "flic");

@@ -394,7 +394,7 @@ export function getMessageType(topic: string): MqttMessageType {
 
 /**
  * Parse MCB switch status from MQTT.
- * 
+ *
  * Topics:
  * - homelab/sensors/sauna/mcb/dps/1 → "true" or "false" (switch state)
  * - homelab/sensors/sauna/mcb/dps/22 → voltage (e.g., "2306" = 230.6V)
@@ -418,7 +418,7 @@ export function parseMcbMessage(
   if (lowerTopic.endsWith("/dps/1")) {
     const str = payloadToString(payload);
     if (str === null) return null;
-    
+
     const isOn = str.toLowerCase() === "true";
     return {
       isOn,
@@ -431,10 +431,10 @@ export function parseMcbMessage(
   if (lowerTopic.endsWith("/dps/22")) {
     const str = payloadToString(payload);
     if (str === null) return null;
-    
+
     const decivolts = Number.parseInt(str, 10);
     if (Number.isNaN(decivolts)) return null;
-    
+
     const voltage = decivolts / 10; // Convert to volts
     return {
       isOn: current?.isOn ?? false,
