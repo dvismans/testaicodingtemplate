@@ -197,6 +197,10 @@ const ConfigSchema = z.object({
     .string()
     .optional()
     .describe("Tuya device ID for floor heating thermostat"),
+  FLOOR_HEATING_IP: z
+    .string()
+    .optional()
+    .describe("IP address of floor heating thermostat on local network"),
   FLOOR_HEATING_LOCAL_KEY: z
     .string()
     .optional()
@@ -331,6 +335,7 @@ export const mqttTopics = {
 export function getFloorHeatingConfig(): Readonly<{
   enabled: true;
   deviceId: string;
+  ip: string | undefined;
   localKey: string;
   protocolVersion: string;
   targetTempOn: number;
@@ -347,6 +352,7 @@ export function getFloorHeatingConfig(): Readonly<{
   return {
     enabled: true,
     deviceId: config.FLOOR_HEATING_DEVICE_ID,
+    ip: config.FLOOR_HEATING_IP,
     localKey: config.FLOOR_HEATING_LOCAL_KEY,
     protocolVersion: config.FLOOR_HEATING_PROTOCOL_VERSION,
     targetTempOn: config.FLOOR_HEATING_TARGET_TEMP_ON,

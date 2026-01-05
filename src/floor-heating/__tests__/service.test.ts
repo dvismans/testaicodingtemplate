@@ -94,6 +94,7 @@ describe("Floor Heating Module", () => {
       const mockConfig = {
         enabled: true as const,
         deviceId: "test-device-id",
+        ip: "192.168.1.100",
         localKey: "test-local-key",
         protocolVersion: "3.3",
         targetTempOn: 21,

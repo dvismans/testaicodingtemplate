@@ -89,20 +89,36 @@ async function ensureConnected(): Promise<Result<true, FloorHeatingError>> {
     return err(statusUnavailable("Floor heating not configured"));
   }
 
-  log.info({ deviceId: config.deviceId }, "Connecting to floor heating...");
+  log.info(
+    { deviceId: config.deviceId, ip: config.ip },
+    "Connecting to floor heating...",
+  );
   state = { ...state, connectionState: "connecting", lastError: null };
 
   try {
-    device = new TuyAPI({
+    // If IP is provided, use it directly (skip UDP discovery)
+    const deviceConfig: {
+      id: string;
+      key: string;
+      version: string;
+      issueGetOnConnect: boolean;
+      ip?: string;
+    } = {
       id: config.deviceId,
       key: config.localKey,
       version: config.protocolVersion,
       issueGetOnConnect: true,
-    });
+    };
+
+    if (config.ip) {
+      deviceConfig.ip = config.ip;
+    }
+
+    device = new TuyAPI(deviceConfig);
 
     setupDeviceHandlers(device);
 
-    // Find device on network
+    // Find device on network (uses IP if provided, otherwise UDP discovery)
     await device.find({ timeout: 10 });
 
     // Connect
