@@ -10,6 +10,7 @@ import type {
   DoorMessage,
   FlicButtonEvent,
   FlicMessage,
+  McbMqttStatus,
   MqttPhaseData,
   PhaseAccumulator,
   PhaseField,
@@ -353,6 +354,7 @@ export type MqttMessageType =
   | "ventilator"
   | "flic"
   | "phase"
+  | "mcb"
   | "unknown";
 
 /**
@@ -376,9 +378,97 @@ export function getMessageType(topic: string): MqttMessageType {
   if (lowerTopic.includes("/flic")) {
     return "flic";
   }
-  if (lowerTopic.includes("p1monitor/phase") || lowerTopic.includes("/phase")) {
+  if (lowerTopic.includes("p1monitor/phase")) {
     return "phase";
+  }
+  if (lowerTopic.includes("/mcb")) {
+    return "mcb";
   }
 
   return "unknown";
+}
+
+// =============================================================================
+// MCB Status Parsing (tuya-mcb-mqtt bridge)
+// =============================================================================
+
+/**
+ * Parse MCB switch status from MQTT.
+ * 
+ * Topics:
+ * - homelab/sensors/sauna/mcb/dps/1 → "true" or "false" (switch state)
+ * - homelab/sensors/sauna/mcb/dps/22 → voltage (e.g., "2306" = 230.6V)
+ * - homelab/sensors/sauna/mcb/status → JSON with all DPS values
+ *
+ * @param topic - MQTT topic
+ * @param payload - Raw message payload
+ * @param current - Current MCB state (to preserve voltage when only switch changes)
+ * @param now - Current timestamp
+ * @returns Updated MCB status or null if not a relevant message
+ */
+export function parseMcbMessage(
+  topic: string,
+  payload: unknown,
+  current: McbMqttStatus | null,
+  now: number,
+): McbMqttStatus | null {
+  const lowerTopic = topic.toLowerCase();
+
+  // Parse switch state from dps/1 topic
+  if (lowerTopic.endsWith("/dps/1")) {
+    const str = payloadToString(payload);
+    if (str === null) return null;
+    
+    const isOn = str.toLowerCase() === "true";
+    return {
+      isOn,
+      voltage: current?.voltage ?? null,
+      lastUpdate: now,
+    };
+  }
+
+  // Parse voltage from dps/22 topic (value in decivolts)
+  if (lowerTopic.endsWith("/dps/22")) {
+    const str = payloadToString(payload);
+    if (str === null) return null;
+    
+    const decivolts = Number.parseInt(str, 10);
+    if (Number.isNaN(decivolts)) return null;
+    
+    const voltage = decivolts / 10; // Convert to volts
+    return {
+      isOn: current?.isOn ?? false,
+      voltage,
+      lastUpdate: now,
+    };
+  }
+
+  // Parse full status JSON
+  if (lowerTopic.endsWith("/status")) {
+    const data = parseJsonPayload(payload);
+    if (!data) return null;
+
+    const switchVal = data["1" as keyof typeof data];
+    const voltageVal = data["22" as keyof typeof data];
+
+    const isOn = typeof switchVal === "boolean" ? switchVal : false;
+    const voltage = typeof voltageVal === "number" ? voltageVal / 10 : null;
+
+    return { isOn, voltage, lastUpdate: now };
+  }
+
+  return null;
+}
+
+/**
+ * Convert payload to string.
+ */
+function payloadToString(payload: unknown): string | null {
+  if (Buffer.isBuffer(payload)) {
+    return payload.toString().trim();
+  }
+  if (typeof payload === "string") {
+    return payload.trim();
+  }
+  return null;
 }

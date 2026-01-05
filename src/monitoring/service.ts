@@ -13,14 +13,16 @@ import {
   logOperationFailed,
   logOperationStart,
 } from "../logger.js";
-import { type McbStatus, getMcbStatus, turnMcbOff } from "../mcb/index.js";
+import { type McbStatus, turnMcbOff } from "../mcb/index.js";
 import {
   type FlicButtonEvent,
+  type McbMqttStatus,
   type MqttPhaseData,
   type SaunaDoorStatus,
   type SaunaTemperature,
   disconnectMqttClient,
   getLastDoorStatus,
+  getLastMcbStatus,
   getLastPhaseData,
   getLastTemperature,
   initializeMqttClient,
@@ -121,12 +123,7 @@ async function triggerSafetyShutdown(triggerPhases: string[]): Promise<void> {
   } else {
     logOperationFailed(log, "safetyShutdown", result.error.message);
 
-    // Verify actual MCB status
-    const statusResult = await getMcbStatus();
-    if (statusResult.isOk()) {
-      state = { ...state, mcbStatus: statusResult.value };
-      broadcastMcbStatus(statusResult.value, "polling");
-    }
+    // MCB status will be updated via MQTT - no need to poll
   }
 }
 
@@ -240,20 +237,43 @@ async function handlePhaseUpdate(data: MqttPhaseData): Promise<void> {
 }
 
 /**
+ * Handle MCB status update from MQTT.
+ */
+function handleMcbUpdate(data: McbMqttStatus): void {
+  const newStatus: McbStatus = data.isOn ? "ON" : "OFF";
+  const previousStatus = state.mcbStatus;
+
+  if (newStatus !== previousStatus) {
+    log.info(
+      { oldStatus: previousStatus, newStatus, voltage: data.voltage },
+      "MCB status changed via MQTT",
+    );
+    state = { ...state, mcbStatus: newStatus };
+    broadcastMcbStatus(newStatus, "mqtt");
+
+    // Handle ventilator control when MCB turns off
+    if (newStatus === "OFF" && previousStatus === "ON") {
+      handleMcbOffVentilator().catch((err) => {
+        log.error({ error: err }, "Failed to handle MCB off ventilator");
+      });
+    }
+  }
+}
+
+/**
  * Single poll cycle.
- * Now only polls MCB status - phase data comes from MQTT.
+ * Phase data AND MCB status now both come from MQTT - no HTTP polling needed.
  */
 async function pollCycle(): Promise<void> {
   const now = Date.now();
 
-  // Poll MCB Status
-  const mcbResult = await getMcbStatus();
-  if (mcbResult.isOk()) {
-    const newStatus = mcbResult.value;
+  // MCB status now comes from MQTT, update state from last known MQTT value
+  const mqttMcbStatus = getLastMcbStatus();
+  if (mqttMcbStatus) {
+    const newStatus: McbStatus = mqttMcbStatus.isOn ? "ON" : "OFF";
     if (newStatus !== state.mcbStatus) {
       log.info({ oldStatus: state.mcbStatus, newStatus }, "MCB status changed");
       state = { ...state, mcbStatus: newStatus };
-      broadcastMcbStatus(newStatus, "polling");
     }
   }
 
@@ -306,6 +326,9 @@ export async function startMonitoringLoop(): Promise<void> {
       handlePhaseUpdate(data).catch((err) => {
         log.error({ error: err }, "Failed to handle phase update");
       });
+    },
+    onMcb: (data: McbMqttStatus) => {
+      handleMcbUpdate(data);
     },
     onFlic: handleFlicEvent,
     onVentilator: (data) => {

@@ -127,6 +127,10 @@ const ConfigSchema = z.object({
     .describe(
       "MQTT topic for P1 monitor phase data (with wildcard for subtopics)",
     ),
+  MQTT_TOPIC_MCB: z
+    .string()
+    .default("homelab/sensors/sauna/mcb/#")
+    .describe("MQTT topic for MCB status (switch on/off from tuya-mcb-mqtt)"),
 
   // ==========================================================================
   // Ventilator (Shelly Relay) Configuration
@@ -250,4 +254,5 @@ export const mqttTopics = {
   ventilator: config.MQTT_TOPIC_VENTILATOR,
   flic: config.MQTT_TOPIC_FLIC,
   phase: config.MQTT_TOPIC_PHASE,
+  mcb: config.MQTT_TOPIC_MCB,
 } as const;

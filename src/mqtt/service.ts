@@ -13,6 +13,7 @@ import { config, mqttTopics } from "../config.js";
 import { createLogger } from "../logger.js";
 import type {
   FlicButtonEvent,
+  McbMqttStatus,
   MqttPhaseData,
   SaunaDoorStatus,
   SaunaTemperature,
@@ -26,6 +27,7 @@ import {
   getMessageType,
   parseDoorMessage,
   parseFlicMessage,
+  parseMcbMessage,
   parsePhaseValue,
   parseRuuviMessage,
   parseVentilatorMessage,
@@ -50,6 +52,7 @@ export type MqttEventHandlers = {
   onVentilator?: (data: VentilatorMqttStatus) => void;
   onPhase?: (data: MqttPhaseData) => void;
   onFlic?: (event: FlicButtonEvent) => void;
+  onMcb?: (data: McbMqttStatus) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -94,6 +97,13 @@ export function getLastVentilatorMqttStatus(): VentilatorMqttStatus | null {
  */
 export function getLastPhaseData(): MqttPhaseData | null {
   return sensorState.phase;
+}
+
+/**
+ * Get last known MCB status from MQTT.
+ */
+export function getLastMcbStatus(): McbMqttStatus | null {
+  return sensorState.mcb;
 }
 
 // =============================================================================
@@ -179,6 +189,7 @@ function subscribeToTopics(client: MqttClient): void {
     mqttTopics.ventilator,
     mqttTopics.flic,
     mqttTopics.phase,
+    mqttTopics.mcb,
   ];
 
   for (const topic of topics) {
@@ -291,6 +302,26 @@ function handleMessage(topic: string, payload: Buffer): void {
           "Complete phase data available",
         );
         eventHandlers.onPhase?.(completeData);
+      }
+      break;
+    }
+
+    case "mcb": {
+      const data = parseMcbMessage(topic, payload, sensorState.mcb, now);
+      if (data) {
+        const statusChanged = sensorState.mcb?.isOn !== data.isOn;
+        sensorState = { ...sensorState, mcb: data };
+
+        if (statusChanged) {
+          log.info(
+            { isOn: data.isOn, voltage: data.voltage },
+            "MCB status changed via MQTT",
+          );
+        } else {
+          log.debug({ isOn: data.isOn, voltage: data.voltage }, "MCB update");
+        }
+
+        eventHandlers.onMcb?.(data);
       }
       break;
     }

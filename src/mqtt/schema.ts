@@ -131,6 +131,21 @@ export type FlicButtonEvent = Readonly<{
 }>;
 
 // =============================================================================
+// MCB Status via MQTT (tuya-mcb-mqtt bridge)
+// =============================================================================
+
+/**
+ * MCB switch status from MQTT.
+ * Topic: homelab/sensors/sauna/mcb/dps/1 (boolean: true=ON, false=OFF)
+ * Or: homelab/sensors/sauna/mcb/status (JSON with "1": true/false)
+ */
+export type McbMqttStatus = Readonly<{
+  isOn: boolean;
+  voltage: number | null;
+  lastUpdate: number;
+}>;
+
+// =============================================================================
 // Smart Meter Phase Data via MQTT
 // =============================================================================
 
@@ -176,6 +191,7 @@ export type SensorState = Readonly<{
   ventilator: VentilatorMqttStatus | null;
   phase: MqttPhaseData | null;
   phaseAccumulator: PhaseAccumulator;
+  mcb: McbMqttStatus | null;
 }>;
 
 /**
@@ -197,4 +213,5 @@ export const INITIAL_SENSOR_STATE: SensorState = {
   ventilator: null,
   phase: null,
   phaseAccumulator: INITIAL_PHASE_ACCUMULATOR,
+  mcb: null,
 };

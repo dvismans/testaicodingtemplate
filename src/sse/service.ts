@@ -149,7 +149,7 @@ export function broadcast(event: SseEvent): void {
  */
 export function broadcastMcbStatus(
   status: "ON" | "OFF" | "UNKNOWN",
-  source: "polling" | "command" | "auto_safety" | "flic",
+  source: "polling" | "command" | "auto_safety" | "flic" | "mqtt",
 ): void {
   broadcast({ type: "mcb_status", status, source });
 }

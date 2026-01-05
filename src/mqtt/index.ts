@@ -11,6 +11,7 @@ export type {
   DoorMessage,
   FlicButtonEvent,
   FlicMessage,
+  McbMqttStatus,
   MqttPhaseData,
   PhaseAccumulator,
   PhaseField,
@@ -28,6 +29,7 @@ export { INITIAL_PHASE_ACCUMULATOR, INITIAL_SENSOR_STATE } from "./schema.js";
 export {
   disconnectMqttClient,
   getLastDoorStatus,
+  getLastMcbStatus,
   getLastPhaseData,
   getLastTemperature,
   getLastVentilatorMqttStatus,
@@ -48,6 +50,7 @@ export {
   getMessageType,
   parseDoorMessage,
   parseFlicMessage,
+  parseMcbMessage,
   parsePhaseMessage,
   parsePhaseValue,
   parseRuuviMessage,

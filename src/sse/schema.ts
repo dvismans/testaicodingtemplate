@@ -18,7 +18,7 @@ import type { PhaseData } from "../smart-meter/index.js";
 export type McbStatusEvent = Readonly<{
   type: "mcb_status";
   status: "ON" | "OFF" | "UNKNOWN";
-  source: "polling" | "command" | "auto_safety" | "flic";
+  source: "polling" | "command" | "auto_safety" | "flic" | "mqtt";
 }>;
 
 /**

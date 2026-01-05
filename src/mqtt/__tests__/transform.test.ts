@@ -14,6 +14,7 @@ import {
   getMessageType,
   parseDoorMessage,
   parseFlicMessage,
+  parseMcbMessage,
   parsePhaseMessage,
   parsePhaseValue,
   parseRuuviMessage,
@@ -586,5 +587,208 @@ describe("getMessageType", () => {
     expect(getMessageType("homelab/sensors/sauna/DOOR/status")).toBe("door");
     expect(getMessageType("homelab/sensors/sauna/Ruuvi/temp")).toBe("ruuvi");
     expect(getMessageType("P1MONITOR/PHASE/L1_A")).toBe("phase");
+  });
+
+  it("identifies mcb topic", () => {
+    expect(getMessageType("homelab/sensors/sauna/mcb/dps/1")).toBe("mcb");
+    expect(getMessageType("homelab/sensors/sauna/mcb/status")).toBe("mcb");
+  });
+});
+
+// =============================================================================
+// parseMcbMessage Tests
+// =============================================================================
+
+describe("parseMcbMessage", () => {
+  const now = 1704067200000;
+
+  describe("parsing switch state from dps/1 topic", () => {
+    it("parses 'true' as ON", () => {
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/1",
+        Buffer.from("true"),
+        null,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: true,
+        voltage: null,
+        lastUpdate: now,
+      });
+    });
+
+    it("parses 'false' as OFF", () => {
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/1",
+        Buffer.from("false"),
+        null,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: false,
+        voltage: null,
+        lastUpdate: now,
+      });
+    });
+
+    it("is case insensitive", () => {
+      const resultTrue = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/1",
+        Buffer.from("TRUE"),
+        null,
+        now,
+      );
+      expect(resultTrue?.isOn).toBe(true);
+
+      const resultFalse = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/1",
+        Buffer.from("FALSE"),
+        null,
+        now,
+      );
+      expect(resultFalse?.isOn).toBe(false);
+    });
+
+    it("preserves voltage from previous state", () => {
+      const current = { isOn: false, voltage: 230.5, lastUpdate: 0 };
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/1",
+        Buffer.from("true"),
+        current,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: true,
+        voltage: 230.5,
+        lastUpdate: now,
+      });
+    });
+  });
+
+  describe("parsing voltage from dps/22 topic", () => {
+    it("parses voltage in decivolts", () => {
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/22",
+        Buffer.from("2306"),
+        null,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: false,
+        voltage: 230.6,
+        lastUpdate: now,
+      });
+    });
+
+    it("preserves switch state from previous state", () => {
+      const current = { isOn: true, voltage: null, lastUpdate: 0 };
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/22",
+        Buffer.from("2285"),
+        current,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: true,
+        voltage: 228.5,
+        lastUpdate: now,
+      });
+    });
+
+    it("returns null for invalid voltage", () => {
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/22",
+        Buffer.from("invalid"),
+        null,
+        now,
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("parsing full status JSON", () => {
+    it("parses JSON status with switch on", () => {
+      const payload = JSON.stringify({
+        "1": true,
+        "22": 2310,
+        "25": 230,
+      });
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/status",
+        Buffer.from(payload),
+        null,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: true,
+        voltage: 231.0,
+        lastUpdate: now,
+      });
+    });
+
+    it("parses JSON status with switch off", () => {
+      const payload = JSON.stringify({
+        "1": false,
+        "22": 2306,
+      });
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/status",
+        Buffer.from(payload),
+        null,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: false,
+        voltage: 230.6,
+        lastUpdate: now,
+      });
+    });
+
+    it("handles missing voltage in JSON", () => {
+      const payload = JSON.stringify({ "1": true });
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/status",
+        Buffer.from(payload),
+        null,
+        now,
+      );
+      expect(result).toEqual({
+        isOn: true,
+        voltage: null,
+        lastUpdate: now,
+      });
+    });
+
+    it("returns null for invalid JSON", () => {
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/status",
+        Buffer.from("not-json"),
+        null,
+        now,
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("unrecognized topics", () => {
+    it("returns null for other dps topics", () => {
+      const result = parseMcbMessage(
+        "homelab/sensors/sauna/mcb/dps/25",
+        Buffer.from("230"),
+        null,
+        now,
+      );
+      expect(result).toBeNull();
+    });
+
+    it("returns null for unrelated topics", () => {
+      const result = parseMcbMessage(
+        "homelab/sensors/other/topic",
+        Buffer.from("data"),
+        null,
+        now,
+      );
+      expect(result).toBeNull();
+    });
   });
 });
