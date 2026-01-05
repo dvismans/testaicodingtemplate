@@ -17,13 +17,13 @@ COPY public/ ./public/
 
 # Runtime configuration via environment variables
 ENV NODE_ENV=production
-ENV PORT=3000
+# PORT comes from .env via compose.yaml env_file
 
-EXPOSE 3000
+# Expose common ports (actual port from .env)
+EXPOSE 3000 8083
 
-# Health check for container orchestration
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+# Note: HEALTHCHECK not supported in OCI format (Podman)
+# Health monitoring done externally
 
 CMD ["bun", "run", "src/index.ts"]
 
