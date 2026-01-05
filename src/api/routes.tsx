@@ -24,7 +24,7 @@ import {
   turnMcbOffLocal,
   turnMcbOnLocal,
 } from "../mcb-local/index.js";
-import { formatMcbError, getMcbStatus } from "../mcb/index.js";
+// Note: Tuya Cloud API (mcb module) no longer used - replaced by local tuyapi (mcb-local)
 import { getCurrentMcbStatus, getSystemState } from "../monitoring/index.js";
 import { getLastDoorStatus, getLastTemperature } from "../mqtt/index.js";
 import { sendCustomNotification } from "../notifications/index.js";
@@ -89,31 +89,18 @@ routes.get("/api/version", (c) => {
 
 /**
  * Get current MCB status.
+ * Uses local tuyapi connection for real-time status.
  */
 routes.get("/api/mcb/status", async (c) => {
   const requestId = c.get("requestId");
   log.info({ requestId }, "GET /api/mcb/status");
 
-  const result = await getMcbStatus();
-
-  if (result.isErr()) {
-    log.error(
-      { requestId, error: formatMcbError(result.error) },
-      "Failed to get MCB status",
-    );
-    return c.json(
-      {
-        status: "UNKNOWN",
-        error: formatMcbError(result.error),
-        requestId,
-      },
-      503,
-    );
-  }
+  // Get MCB status from local tuyapi connection
+  const mcbStatus = getCurrentMcbStatus();
 
   return c.json({
-    status: result.value,
-    source: "local_api",
+    status: mcbStatus,
+    source: "local_tuyapi",
     requestId,
   });
 });

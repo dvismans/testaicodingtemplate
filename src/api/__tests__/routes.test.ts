@@ -10,10 +10,7 @@ import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock the service layer modules BEFORE importing routes
-vi.mock("../../mcb/index.js", () => ({
-  getMcbStatus: vi.fn(),
-  formatMcbError: vi.fn((err) => err.message || "Unknown error"),
-}));
+// Note: mcb module (Tuya Cloud) no longer used for status - replaced by mcb-local (tuyapi)
 
 vi.mock("../../mcb-local/index.js", () => ({
   turnMcbOnLocal: vi.fn(),
@@ -118,7 +115,7 @@ vi.mock("../../logger.js", () => ({
 import { err, ok } from "neverthrow";
 import { getNotificationConfig, getVentilatorConfig } from "../../config.js";
 import { turnMcbOffLocal, turnMcbOnLocal } from "../../mcb-local/index.js";
-import { getMcbStatus } from "../../mcb/index.js";
+// Note: getMcbStatus from mcb module no longer used - replaced by getCurrentMcbStatus
 import { getCurrentMcbStatus, getSystemState } from "../../monitoring/index.js";
 import { getLastDoorStatus, getLastTemperature } from "../../mqtt/index.js";
 import { sendCustomNotification } from "../../notifications/index.js";
@@ -229,8 +226,8 @@ describe("API Routes", () => {
 
   describe("GET /api/mcb/status", () => {
     test("returns ON status when MCB is on", async () => {
-      // Arrange
-      vi.mocked(getMcbStatus).mockResolvedValue(ok("ON"));
+      // Arrange - mock getCurrentMcbStatus from monitoring module
+      vi.mocked(getCurrentMcbStatus).mockReturnValue("ON");
 
       // Act
       const res = await app.request("/api/mcb/status");
@@ -239,12 +236,12 @@ describe("API Routes", () => {
       // Assert
       expect(res.status).toBe(200);
       expect(body.status).toBe("ON");
-      expect(body.source).toBe("local_api");
+      expect(body.source).toBe("local_tuyapi");
     });
 
     test("returns OFF status when MCB is off", async () => {
       // Arrange
-      vi.mocked(getMcbStatus).mockResolvedValue(ok("OFF"));
+      vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
 
       // Act
       const res = await app.request("/api/mcb/status");
@@ -255,22 +252,16 @@ describe("API Routes", () => {
       expect(body.status).toBe("OFF");
     });
 
-    test("returns error status when local API is unavailable", async () => {
+    test("returns UNKNOWN status when MCB status is unknown", async () => {
       // Arrange
-      vi.mocked(getMcbStatus).mockResolvedValue(
-        err({
-          type: "STATUS_UNAVAILABLE",
-          message: "Connection refused",
-          source: "local",
-        }),
-      );
+      vi.mocked(getCurrentMcbStatus).mockReturnValue("UNKNOWN");
 
       // Act
       const res = await app.request("/api/mcb/status");
       const body = await res.json();
 
-      // Assert - API returns 503 for service unavailable
-      expect(res.status).toBeGreaterThanOrEqual(400);
+      // Assert - Always returns 200, just with UNKNOWN status
+      expect(res.status).toBe(200);
       expect(body.status).toBe("UNKNOWN");
     });
   });
