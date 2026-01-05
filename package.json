@@ -22,12 +22,13 @@
     "container:logs": "podman compose logs -f",
     "container:restart": "podman compose down && podman compose up -d --build",
     "deploy:init": "ssh homelab.local 'mkdir -p /home/davidvismans/apps && cd /home/davidvismans/apps && ([ -d sauna-control ] || git clone https://github.com/dvismans/testaicodingtemplate.git sauna-control)'",
+    "deploy:env": "scp .env homelab.local:/home/davidvismans/apps/sauna-control/.env",
     "deploy:pull": "ssh homelab.local 'cd /home/davidvismans/apps/sauna-control && git pull'",
     "deploy:build": "ssh homelab.local 'cd /home/davidvismans/apps/sauna-control && ~/.local/bin/podman-compose build'",
     "deploy:up": "ssh homelab.local 'cd /home/davidvismans/apps/sauna-control && ~/.local/bin/podman-compose up -d'",
     "deploy:down": "ssh homelab.local 'cd /home/davidvismans/apps/sauna-control && ~/.local/bin/podman-compose down'",
     "deploy:logs": "ssh homelab.local 'cd /home/davidvismans/apps/sauna-control && ~/.local/bin/podman-compose logs -f'",
-    "deploy": "bun run deploy:init && bun run deploy:pull && bun run deploy:build && bun run deploy:up"
+    "deploy": "bun run deploy:init && bun run deploy:env && bun run deploy:pull && bun run deploy:build && bun run deploy:up"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
