@@ -1,8 +1,9 @@
 /**
  * Smart Meter Module - Public API
  *
- * Exports only what's needed by other modules.
- * Internal implementation details stay hidden.
+ * Phase data is now received via MQTT (p1monitor/phase/#).
+ * This module contains types and pure transformation functions
+ * for threshold checking and amperage calculations.
  *
  * @see Rule #2 (Module Boundaries are Contracts)
  */
@@ -18,9 +19,6 @@ export type { SmartMeterError } from "./errors.js";
 
 // Error utilities
 export { formatSmartMeterError } from "./errors.js";
-
-// Service functions (side effects)
-export { pollSmartMeter } from "./service.js";
 
 // Pure transformations
 export {

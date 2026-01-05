@@ -80,16 +80,8 @@ const ConfigSchema = z.object({
     .describe("Tuya Cloud API base URL (region-specific)"),
 
   // ==========================================================================
-  // Smart Meter Configuration
+  // Safety Thresholds (phase data now from MQTT)
   // ==========================================================================
-  SMART_METER_URL: z
-    .string()
-    .url()
-    .describe("External smart meter API endpoint"),
-  SMART_METER_API_KEY: z
-    .string()
-    .min(1, "SMART_METER_API_KEY is required")
-    .describe("API key for smart meter authentication"),
   AMPERAGE_THRESHOLD: z.coerce
     .number()
     .positive()
