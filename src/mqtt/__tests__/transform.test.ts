@@ -7,12 +7,18 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { INITIAL_PHASE_ACCUMULATOR } from "../schema.js";
 import {
+  accumulatorToPhaseData,
+  extractPhaseField,
   getMessageType,
   parseDoorMessage,
   parseFlicMessage,
+  parsePhaseMessage,
+  parsePhaseValue,
   parseRuuviMessage,
   parseVentilatorMessage,
+  updatePhaseAccumulator,
 } from "../transform.js";
 
 // =============================================================================
@@ -302,6 +308,244 @@ describe("parseFlicMessage", () => {
 });
 
 // =============================================================================
+// extractPhaseField Tests
+// =============================================================================
+
+describe("extractPhaseField", () => {
+  it("extracts l1_a from topic", () => {
+    expect(extractPhaseField("p1monitor/phase/l1_a")).toBe("l1_a");
+  });
+
+  it("extracts l2_a from topic", () => {
+    expect(extractPhaseField("p1monitor/phase/l2_a")).toBe("l2_a");
+  });
+
+  it("extracts l3_a from topic", () => {
+    expect(extractPhaseField("p1monitor/phase/l3_a")).toBe("l3_a");
+  });
+
+  it("is case insensitive", () => {
+    expect(extractPhaseField("P1MONITOR/PHASE/L1_A")).toBe("l1_a");
+  });
+
+  it("returns null for voltage topics", () => {
+    expect(extractPhaseField("p1monitor/phase/l1_v")).toBeNull();
+  });
+
+  it("returns null for consumption topics", () => {
+    expect(extractPhaseField("p1monitor/phase/consumption_l1_w")).toBeNull();
+  });
+
+  it("returns null for timestamp topics", () => {
+    expect(extractPhaseField("p1monitor/phase/timestamp_local")).toBeNull();
+  });
+});
+
+// =============================================================================
+// parsePhaseValue Tests
+// =============================================================================
+
+describe("parsePhaseValue", () => {
+  it("parses string number", () => {
+    expect(parsePhaseValue("12.0")).toBe(12.0);
+  });
+
+  it("parses integer string", () => {
+    expect(parsePhaseValue("15")).toBe(15);
+  });
+
+  it("parses Buffer payload", () => {
+    expect(parsePhaseValue(Buffer.from("7.5"))).toBe(7.5);
+  });
+
+  it("handles whitespace", () => {
+    expect(parsePhaseValue("  3.2  ")).toBe(3.2);
+  });
+
+  it("parses zero", () => {
+    expect(parsePhaseValue("0")).toBe(0);
+  });
+
+  it("parses negative values", () => {
+    expect(parsePhaseValue("-1.5")).toBe(-1.5);
+  });
+
+  it("returns null for non-numeric string", () => {
+    expect(parsePhaseValue("not a number")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(parsePhaseValue("")).toBeNull();
+  });
+
+  it("returns null for non-string/buffer input", () => {
+    expect(parsePhaseValue({ value: 12 })).toBeNull();
+  });
+});
+
+// =============================================================================
+// updatePhaseAccumulator Tests
+// =============================================================================
+
+describe("updatePhaseAccumulator", () => {
+  const now = 1704067200000;
+
+  it("updates l1_a value", () => {
+    const result = updatePhaseAccumulator(
+      INITIAL_PHASE_ACCUMULATOR,
+      "l1_a",
+      12.0,
+      now,
+    );
+
+    expect(result.l1_a).toBe(12.0);
+    expect(result.l2_a).toBeNull();
+    expect(result.l3_a).toBeNull();
+    expect(result.lastUpdate).toBe(now);
+  });
+
+  it("updates l2_a value", () => {
+    const result = updatePhaseAccumulator(
+      INITIAL_PHASE_ACCUMULATOR,
+      "l2_a",
+      7.0,
+      now,
+    );
+
+    expect(result.l1_a).toBeNull();
+    expect(result.l2_a).toBe(7.0);
+    expect(result.l3_a).toBeNull();
+  });
+
+  it("preserves existing values when updating", () => {
+    const withL1 = updatePhaseAccumulator(
+      INITIAL_PHASE_ACCUMULATOR,
+      "l1_a",
+      12.0,
+      now,
+    );
+    const withL1L2 = updatePhaseAccumulator(withL1, "l2_a", 7.0, now + 1);
+
+    expect(withL1L2.l1_a).toBe(12.0);
+    expect(withL1L2.l2_a).toBe(7.0);
+    expect(withL1L2.l3_a).toBeNull();
+  });
+
+  it("updates lastUpdate timestamp", () => {
+    const result = updatePhaseAccumulator(
+      INITIAL_PHASE_ACCUMULATOR,
+      "l3_a",
+      3.0,
+      now + 100,
+    );
+
+    expect(result.lastUpdate).toBe(now + 100);
+  });
+});
+
+// =============================================================================
+// accumulatorToPhaseData Tests
+// =============================================================================
+
+describe("accumulatorToPhaseData", () => {
+  const now = 1704067200000;
+
+  it("returns null when all values are missing", () => {
+    expect(accumulatorToPhaseData(INITIAL_PHASE_ACCUMULATOR)).toBeNull();
+  });
+
+  it("returns null when l1_a is missing", () => {
+    const acc = {
+      ...INITIAL_PHASE_ACCUMULATOR,
+      l2_a: 7.0,
+      l3_a: 3.0,
+      lastUpdate: now,
+    };
+    expect(accumulatorToPhaseData(acc)).toBeNull();
+  });
+
+  it("returns null when l2_a is missing", () => {
+    const acc = {
+      ...INITIAL_PHASE_ACCUMULATOR,
+      l1_a: 12.0,
+      l3_a: 3.0,
+      lastUpdate: now,
+    };
+    expect(accumulatorToPhaseData(acc)).toBeNull();
+  });
+
+  it("returns null when l3_a is missing", () => {
+    const acc = {
+      ...INITIAL_PHASE_ACCUMULATOR,
+      l1_a: 12.0,
+      l2_a: 7.0,
+      lastUpdate: now,
+    };
+    expect(accumulatorToPhaseData(acc)).toBeNull();
+  });
+
+  it("returns complete phase data when all values present", () => {
+    const acc = { l1_a: 12.0, l2_a: 7.0, l3_a: 3.0, lastUpdate: now };
+
+    const result = accumulatorToPhaseData(acc);
+
+    expect(result).toEqual({
+      l1: 12.0,
+      l2: 7.0,
+      l3: 3.0,
+      lastUpdate: now,
+    });
+  });
+
+  it("handles zero values", () => {
+    const acc = { l1_a: 0, l2_a: 0, l3_a: 0, lastUpdate: now };
+
+    const result = accumulatorToPhaseData(acc);
+
+    expect(result).toEqual({
+      l1: 0,
+      l2: 0,
+      l3: 0,
+      lastUpdate: now,
+    });
+  });
+});
+
+// =============================================================================
+// parsePhaseMessage Tests (Legacy JSON format)
+// =============================================================================
+
+describe("parsePhaseMessage", () => {
+  const now = 1704067200000;
+
+  it("parses valid phase message with amperage data", () => {
+    const payload = JSON.stringify({
+      l1_a: 12.0,
+      l2_a: 7.0,
+      l3_a: 3.0,
+    });
+
+    const result = parsePhaseMessage(payload, now);
+
+    expect(result).toEqual({
+      l1: 12.0,
+      l2: 7.0,
+      l3: 3.0,
+      lastUpdate: now,
+    });
+  });
+
+  it("returns null for missing l1_a field", () => {
+    const payload = JSON.stringify({ l2_a: 5, l3_a: 2 });
+    expect(parsePhaseMessage(payload, now)).toBeNull();
+  });
+
+  it("returns null for invalid JSON", () => {
+    expect(parsePhaseMessage("not json", now)).toBeNull();
+  });
+});
+
+// =============================================================================
 // getMessageType Tests
 // =============================================================================
 
@@ -324,6 +568,16 @@ describe("getMessageType", () => {
     expect(getMessageType("homelab/controls/sauna/flic/button1")).toBe("flic");
   });
 
+  it("identifies p1monitor phase topic", () => {
+    expect(getMessageType("p1monitor/phase")).toBe("phase");
+  });
+
+  it("identifies p1monitor phase subtopic", () => {
+    expect(getMessageType("p1monitor/phase/l1_a")).toBe("phase");
+    expect(getMessageType("p1monitor/phase/l2_a")).toBe("phase");
+    expect(getMessageType("p1monitor/phase/l3_a")).toBe("phase");
+  });
+
   it("returns unknown for unrecognized topic", () => {
     expect(getMessageType("some/other/topic")).toBe("unknown");
   });
@@ -331,5 +585,6 @@ describe("getMessageType", () => {
   it("is case insensitive", () => {
     expect(getMessageType("homelab/sensors/sauna/DOOR/status")).toBe("door");
     expect(getMessageType("homelab/sensors/sauna/Ruuvi/temp")).toBe("ruuvi");
+    expect(getMessageType("P1MONITOR/PHASE/L1_A")).toBe("phase");
   });
 });

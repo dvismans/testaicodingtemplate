@@ -131,6 +131,39 @@ export type FlicButtonEvent = Readonly<{
 }>;
 
 // =============================================================================
+// Smart Meter Phase Data via MQTT
+// =============================================================================
+
+/**
+ * Phase field identifier for individual MQTT topics.
+ * P1 Monitor publishes each value to a separate topic:
+ * - p1monitor/phase/l1_a, l2_a, l3_a
+ */
+export type PhaseField = "l1_a" | "l2_a" | "l3_a";
+
+/**
+ * Accumulated phase values from individual MQTT messages.
+ * Updated as each topic publishes a new value.
+ */
+export type PhaseAccumulator = {
+  l1_a: number | null;
+  l2_a: number | null;
+  l3_a: number | null;
+  lastUpdate: number;
+};
+
+/**
+ * Parsed phase data for internal use.
+ * Matches the existing PhaseData type from smart-meter module.
+ */
+export type MqttPhaseData = Readonly<{
+  l1: number;
+  l2: number;
+  l3: number;
+  lastUpdate: number;
+}>;
+
+// =============================================================================
 // MQTT Client State
 // =============================================================================
 
@@ -141,7 +174,19 @@ export type SensorState = Readonly<{
   temperature: SaunaTemperature | null;
   door: SaunaDoorStatus | null;
   ventilator: VentilatorMqttStatus | null;
+  phase: MqttPhaseData | null;
+  phaseAccumulator: PhaseAccumulator;
 }>;
+
+/**
+ * Initial phase accumulator.
+ */
+export const INITIAL_PHASE_ACCUMULATOR: PhaseAccumulator = {
+  l1_a: null,
+  l2_a: null,
+  l3_a: null,
+  lastUpdate: 0,
+};
 
 /**
  * Initial sensor state.
@@ -150,4 +195,6 @@ export const INITIAL_SENSOR_STATE: SensorState = {
   temperature: null,
   door: null,
   ventilator: null,
+  phase: null,
+  phaseAccumulator: INITIAL_PHASE_ACCUMULATOR,
 };

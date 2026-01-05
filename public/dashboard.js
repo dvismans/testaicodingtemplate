@@ -43,6 +43,7 @@
   var mcbStatusText = document.getElementById("mcb-status-text");
   var tempValue = document.getElementById("temp-value");
   var tempAge = document.getElementById("temp-age");
+  var phaseSection = document.getElementById("phase-section");
   var phaseAge = document.getElementById("phase-age");
   var doorStatus = document.getElementById("door-status");
   var ventilatorStatus = document.getElementById("ventilator-status");
@@ -111,6 +112,23 @@
       mcbToggle.style.color = "";
       mcbStatusText.textContent = "Status Unknown";
       mcbToggle.disabled = true;
+    }
+
+    // Show/hide phase section based on MCB status
+    updatePhaseSectionVisibility();
+  }
+
+  /**
+   * Show phase section only when sauna is ON.
+   * When OFF, phase data is not relevant to sauna operation.
+   */
+  function updatePhaseSectionVisibility() {
+    if (!phaseSection) return;
+
+    if (mcbStatus === "ON") {
+      phaseSection.style.display = "";
+    } else {
+      phaseSection.style.display = "none";
     }
   }
 
@@ -347,6 +365,11 @@
 
   // Start SSE connection
   connectSSE();
+
+  // Hide phase section initially (until we know MCB is ON)
+  if (phaseSection) {
+    phaseSection.style.display = "none";
+  }
 
   // Initial MCB status fetch
   fetch("/api/mcb/status")

@@ -13,6 +13,7 @@ import { config, mqttTopics } from "../config.js";
 import { createLogger } from "../logger.js";
 import type {
   FlicButtonEvent,
+  MqttPhaseData,
   SaunaDoorStatus,
   SaunaTemperature,
   SensorState,
@@ -20,11 +21,15 @@ import type {
 } from "./schema.js";
 import { INITIAL_SENSOR_STATE } from "./schema.js";
 import {
+  accumulatorToPhaseData,
+  extractPhaseField,
   getMessageType,
   parseDoorMessage,
   parseFlicMessage,
+  parsePhaseValue,
   parseRuuviMessage,
   parseVentilatorMessage,
+  updatePhaseAccumulator,
 } from "./transform.js";
 
 const log = createLogger("mqtt");
@@ -43,6 +48,7 @@ export type MqttEventHandlers = {
   onTemperature?: (data: SaunaTemperature) => void;
   onDoor?: (data: SaunaDoorStatus) => void;
   onVentilator?: (data: VentilatorMqttStatus) => void;
+  onPhase?: (data: MqttPhaseData) => void;
   onFlic?: (event: FlicButtonEvent) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -81,6 +87,13 @@ export function getLastDoorStatus(): SaunaDoorStatus | null {
  */
 export function getLastVentilatorMqttStatus(): VentilatorMqttStatus | null {
   return sensorState.ventilator;
+}
+
+/**
+ * Get last known phase data from MQTT (smart meter L1/L2/L3 amperage).
+ */
+export function getLastPhaseData(): MqttPhaseData | null {
+  return sensorState.phase;
 }
 
 // =============================================================================
@@ -165,6 +178,7 @@ function subscribeToTopics(client: MqttClient): void {
     mqttTopics.ruuvi,
     mqttTopics.ventilator,
     mqttTopics.flic,
+    mqttTopics.phase,
   ];
 
   for (const topic of topics) {
@@ -236,6 +250,47 @@ function handleMessage(topic: string, payload: Buffer): void {
           "Flic button event",
         );
         eventHandlers.onFlic?.(event);
+      }
+      break;
+    }
+
+    case "phase": {
+      // P1 Monitor publishes individual values to separate topics
+      const field = extractPhaseField(topic);
+      if (!field) {
+        log.debug({ topic }, "Ignoring non-amperage phase topic");
+        break;
+      }
+
+      const value = parsePhaseValue(payload);
+      if (value === null) {
+        log.debug(
+          { topic, payload: payload.toString() },
+          "Failed to parse phase value",
+        );
+        break;
+      }
+
+      // Update accumulator with new value
+      const updatedAccumulator = updatePhaseAccumulator(
+        sensorState.phaseAccumulator,
+        field,
+        value,
+        now,
+      );
+      sensorState = { ...sensorState, phaseAccumulator: updatedAccumulator };
+
+      log.debug({ field, value }, "Phase value received");
+
+      // Check if we have all three values - if so, emit complete phase data
+      const completeData = accumulatorToPhaseData(updatedAccumulator);
+      if (completeData) {
+        sensorState = { ...sensorState, phase: completeData };
+        log.debug(
+          { l1: completeData.l1, l2: completeData.l2, l3: completeData.l3 },
+          "Complete phase data available",
+        );
+        eventHandlers.onPhase?.(completeData);
       }
       break;
     }

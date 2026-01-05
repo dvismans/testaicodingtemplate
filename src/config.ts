@@ -129,6 +129,12 @@ const ConfigSchema = z.object({
     .string()
     .default("homelab/controls/sauna/flic/#")
     .describe("MQTT topic for Flic button events"),
+  MQTT_TOPIC_PHASE: z
+    .string()
+    .default("p1monitor/phase/#")
+    .describe(
+      "MQTT topic for P1 monitor phase data (with wildcard for subtopics)",
+    ),
 
   // ==========================================================================
   // Ventilator (Shelly Relay) Configuration
@@ -251,4 +257,5 @@ export const mqttTopics = {
   ruuvi: config.MQTT_TOPIC_RUUVI,
   ventilator: config.MQTT_TOPIC_VENTILATOR,
   flic: config.MQTT_TOPIC_FLIC,
+  phase: config.MQTT_TOPIC_PHASE,
 } as const;

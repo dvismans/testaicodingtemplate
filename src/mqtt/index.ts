@@ -11,6 +11,9 @@ export type {
   DoorMessage,
   FlicButtonEvent,
   FlicMessage,
+  MqttPhaseData,
+  PhaseAccumulator,
+  PhaseField,
   RuuviMessage,
   SaunaDoorStatus,
   SaunaTemperature,
@@ -19,12 +22,13 @@ export type {
   VentilatorMqttStatus,
 } from "./schema.js";
 
-export { INITIAL_SENSOR_STATE } from "./schema.js";
+export { INITIAL_PHASE_ACCUMULATOR, INITIAL_SENSOR_STATE } from "./schema.js";
 
 // Service functions
 export {
   disconnectMqttClient,
   getLastDoorStatus,
+  getLastPhaseData,
   getLastTemperature,
   getLastVentilatorMqttStatus,
   getSensorState,
@@ -39,9 +43,14 @@ export type { MqttEventHandlers } from "./service.js";
 export type { MqttMessageType } from "./transform.js";
 
 export {
+  accumulatorToPhaseData,
+  extractPhaseField,
   getMessageType,
   parseDoorMessage,
   parseFlicMessage,
+  parsePhaseMessage,
+  parsePhaseValue,
   parseRuuviMessage,
   parseVentilatorMessage,
+  updatePhaseAccumulator,
 } from "./transform.js";

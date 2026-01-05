@@ -16,10 +16,12 @@ import {
 import { type McbStatus, getMcbStatus, turnMcbOff } from "../mcb/index.js";
 import {
   type FlicButtonEvent,
+  type MqttPhaseData,
   type SaunaDoorStatus,
   type SaunaTemperature,
   disconnectMqttClient,
   getLastDoorStatus,
+  getLastPhaseData,
   getLastTemperature,
   initializeMqttClient,
 } from "../mqtt/index.js";
@@ -27,11 +29,7 @@ import {
   sendSafetyShutdownNotification,
   sendTemperatureNotification,
 } from "../notifications/index.js";
-import {
-  type PhaseData,
-  checkThresholds,
-  pollSmartMeter,
-} from "../smart-meter/index.js";
+import { type PhaseData, checkThresholds } from "../smart-meter/index.js";
 import {
   broadcastDoor,
   broadcastMcbStatus,
@@ -217,12 +215,38 @@ async function handleFlicEvent(event: FlicButtonEvent): Promise<void> {
 // =============================================================================
 
 /**
+ * Handle phase data update from MQTT.
+ * Checks for over-amperage and triggers safety shutdown if needed.
+ */
+async function handlePhaseUpdate(data: MqttPhaseData): Promise<void> {
+  // Convert to PhaseData format
+  const phaseData: PhaseData = { l1: data.l1, l2: data.l2, l3: data.l3 };
+  state = { ...state, phaseData };
+
+  // Broadcast sensor data to all SSE clients
+  broadcastSensorData(data.l1, data.l2, data.l3);
+
+  // Only check thresholds when MCB is ON
+  if (state.mcbStatus === "ON" && config.ENABLE_SAFETY_SHUTDOWN) {
+    const threshold = checkThresholds(phaseData, config.AMPERAGE_THRESHOLD);
+    if (threshold.exceeds) {
+      // Format phases as strings for the notification
+      const formattedPhases = threshold.phases.map(
+        (p) => `${p.phase} (${p.amperage}A)`,
+      );
+      await triggerSafetyShutdown(formattedPhases);
+    }
+  }
+}
+
+/**
  * Single poll cycle.
+ * Now only polls MCB status - phase data comes from MQTT.
  */
 async function pollCycle(): Promise<void> {
   const now = Date.now();
 
-  // 1. Poll MCB Status
+  // Poll MCB Status
   const mcbResult = await getMcbStatus();
   if (mcbResult.isOk()) {
     const newStatus = mcbResult.value;
@@ -233,36 +257,18 @@ async function pollCycle(): Promise<void> {
     }
   }
 
-  // 2. Poll Smart Meter ONLY when MCB is ON
-  if (state.mcbStatus === "ON") {
-    const meterResult = await pollSmartMeter();
-
-    if (meterResult.isOk()) {
-      const phaseData = meterResult.value;
-      state = { ...state, phaseData };
-
-      // Broadcast sensor data
-      broadcastSensorData(phaseData.l1, phaseData.l2, phaseData.l3);
-
-      // Check for over-amperage
-      if (config.ENABLE_SAFETY_SHUTDOWN) {
-        const threshold = checkThresholds(phaseData, config.AMPERAGE_THRESHOLD);
-        if (threshold.exceeds) {
-          // Format phases as strings for the notification
-          const formattedPhases = threshold.phases.map(
-            (p) => `${p.phase} (${p.amperage}A)`,
-          );
-          await triggerSafetyShutdown(formattedPhases);
-        }
-      }
-    } else {
-      // Broadcast null sensor data on error
-      broadcastSensorData(null, null, null);
-    }
-  } else {
-    // MCB is OFF - broadcast null sensor data
-    state = { ...state, phaseData: null };
-    broadcastSensorData(null, null, null);
+  // Phase data now comes from MQTT, no HTTP polling needed
+  // Just update state with latest MQTT phase data if available
+  const mqttPhaseData = getLastPhaseData();
+  if (mqttPhaseData) {
+    state = {
+      ...state,
+      phaseData: {
+        l1: mqttPhaseData.l1,
+        l2: mqttPhaseData.l2,
+        l3: mqttPhaseData.l3,
+      },
+    };
   }
 
   state = { ...state, lastPollTime: now };
@@ -295,6 +301,11 @@ export async function startMonitoringLoop(): Promise<void> {
     },
     onDoor: (data: SaunaDoorStatus) => {
       broadcastDoor(data.isOpen);
+    },
+    onPhase: (data: MqttPhaseData) => {
+      handlePhaseUpdate(data).catch((err) => {
+        log.error({ error: err }, "Failed to handle phase update");
+      });
     },
     onFlic: handleFlicEvent,
     onVentilator: (data) => {

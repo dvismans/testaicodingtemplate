@@ -10,6 +10,9 @@ import type {
   DoorMessage,
   FlicButtonEvent,
   FlicMessage,
+  MqttPhaseData,
+  PhaseAccumulator,
+  PhaseField,
   RuuviMessage,
   SaunaDoorStatus,
   SaunaTemperature,
@@ -132,6 +135,122 @@ export function parseVentilatorMessage(
 }
 
 // =============================================================================
+// Phase Data Parsing (Smart Meter via MQTT - Individual Topics)
+// =============================================================================
+
+/**
+ * Extract phase field name from MQTT topic.
+ * Topic format: p1monitor/phase/l1_a, p1monitor/phase/l2_a, etc.
+ *
+ * @param topic - Full MQTT topic
+ * @returns Phase field name or null if not a phase amperage topic
+ */
+export function extractPhaseField(topic: string): PhaseField | null {
+  const lowerTopic = topic.toLowerCase();
+
+  if (lowerTopic.endsWith("/l1_a")) return "l1_a";
+  if (lowerTopic.endsWith("/l2_a")) return "l2_a";
+  if (lowerTopic.endsWith("/l3_a")) return "l3_a";
+
+  return null;
+}
+
+/**
+ * Parse a raw MQTT payload as a numeric value (amperage).
+ * P1 Monitor publishes plain numbers to individual topics.
+ *
+ * @param payload - Raw message payload (Buffer or string)
+ * @returns Parsed number or null if invalid
+ */
+export function parsePhaseValue(payload: unknown): number | null {
+  let str: string;
+
+  if (Buffer.isBuffer(payload)) {
+    str = payload.toString().trim();
+  } else if (typeof payload === "string") {
+    str = payload.trim();
+  } else {
+    return null;
+  }
+
+  const value = Number.parseFloat(str);
+  return Number.isNaN(value) ? null : value;
+}
+
+/**
+ * Update phase accumulator with a new value.
+ *
+ * @param accumulator - Current accumulator state
+ * @param field - Which phase field to update
+ * @param value - New value
+ * @param now - Current timestamp
+ * @returns Updated accumulator
+ */
+export function updatePhaseAccumulator(
+  accumulator: PhaseAccumulator,
+  field: PhaseField,
+  value: number,
+  now: number,
+): PhaseAccumulator {
+  return {
+    ...accumulator,
+    [field]: value,
+    lastUpdate: now,
+  };
+}
+
+/**
+ * Convert phase accumulator to MqttPhaseData if all values are present.
+ *
+ * @param accumulator - Current accumulator state
+ * @returns Complete phase data or null if any value is missing
+ */
+export function accumulatorToPhaseData(
+  accumulator: PhaseAccumulator,
+): MqttPhaseData | null {
+  if (
+    accumulator.l1_a === null ||
+    accumulator.l2_a === null ||
+    accumulator.l3_a === null
+  ) {
+    return null;
+  }
+
+  return {
+    l1: accumulator.l1_a,
+    l2: accumulator.l2_a,
+    l3: accumulator.l3_a,
+    lastUpdate: accumulator.lastUpdate,
+  };
+}
+
+/**
+ * Legacy function for backward compatibility with tests.
+ * Parses a JSON message with all phase fields (not used by P1 Monitor).
+ */
+export function parsePhaseMessage(
+  payload: unknown,
+  now: number,
+): MqttPhaseData | null {
+  const data = parseJsonPayload(payload);
+  if (!data) return null;
+
+  // Access via bracket notation to satisfy both TypeScript's noPropertyAccessFromIndexSignature
+  // and store in typed variables
+  const l1Raw = data["l1_a" as keyof typeof data];
+  const l2Raw = data["l2_a" as keyof typeof data];
+  const l3Raw = data["l3_a" as keyof typeof data];
+
+  const l1 = typeof l1Raw === "number" ? l1Raw : null;
+  const l2 = typeof l2Raw === "number" ? l2Raw : null;
+  const l3 = typeof l3Raw === "number" ? l3Raw : null;
+
+  if (l1 === null || l2 === null || l3 === null) return null;
+
+  return { l1, l2, l3, lastUpdate: now };
+}
+
+// =============================================================================
 // Flic Button Parsing
 // =============================================================================
 
@@ -233,6 +352,7 @@ export type MqttMessageType =
   | "ruuvi"
   | "ventilator"
   | "flic"
+  | "phase"
   | "unknown";
 
 /**
@@ -255,6 +375,9 @@ export function getMessageType(topic: string): MqttMessageType {
   }
   if (lowerTopic.includes("/flic")) {
     return "flic";
+  }
+  if (lowerTopic.includes("p1monitor/phase") || lowerTopic.includes("/phase")) {
+    return "phase";
   }
 
   return "unknown";

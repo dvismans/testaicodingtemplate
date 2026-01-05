@@ -128,22 +128,24 @@ export const Dashboard: FC<DashboardProps> = ({
   ventilatorOn,
 }) => (
   <BaseLayout title="Sauna Control">
-    {/* Phase amperage display */}
-    <div class="grid" style={{ marginBottom: "1rem" }}>
-      <PhaseCard phase="L1" color="#e74c3c" />
-      <PhaseCard phase="L2" color="#f39c12" />
-      <PhaseCard phase="L3" color="#3498db" />
+    {/* Phase amperage display - hidden when sauna is OFF */}
+    <div id="phase-section">
+      <div class="grid" style={{ marginBottom: "1rem" }}>
+        <PhaseCard phase="L1" color="#e74c3c" />
+        <PhaseCard phase="L2" color="#f39c12" />
+        <PhaseCard phase="L3" color="#3498db" />
+      </div>
+      <p
+        id="phase-age"
+        style={{
+          textAlign: "center",
+          color: "var(--muted-color)",
+          marginBottom: "1rem",
+        }}
+      >
+        <small>Phase data unavailable</small>
+      </p>
     </div>
-    <p
-      id="phase-age"
-      style={{
-        textAlign: "center",
-        color: "var(--muted-color)",
-        marginBottom: "1rem",
-      }}
-    >
-      <small>Phase data unavailable</small>
-    </p>
 
     {/* Temperature */}
     <TemperatureCard />
