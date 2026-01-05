@@ -11,8 +11,9 @@ WORKDIR /app
 COPY package.json bun.lockb* bunfig.toml tsconfig.json ./
 RUN bun install --frozen-lockfile --production
 
-# Then source
+# Then source and static files
 COPY src/ ./src/
+COPY public/ ./public/
 
 # Runtime configuration via environment variables
 ENV NODE_ENV=production
