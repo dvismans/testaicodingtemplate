@@ -29,7 +29,6 @@ export { INITIAL_PHASE_ACCUMULATOR, INITIAL_SENSOR_STATE } from "./schema.js";
 export {
   disconnectMqttClient,
   getLastDoorStatus,
-  getLastMcbStatus,
   getLastPhaseData,
   getLastTemperature,
   getLastVentilatorMqttStatus,
@@ -38,6 +37,7 @@ export {
   isConnected,
   updateEventHandlers,
 } from "./service.js";
+// getLastMcbStatus removed - MCB status now from local tuyapi
 
 export type { MqttEventHandlers } from "./service.js";
 

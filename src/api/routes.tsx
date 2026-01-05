@@ -19,12 +19,12 @@ import {
   getVentilatorConfig,
 } from "../config.js";
 import { createLogger } from "../logger.js";
+import { formatMcbError, getMcbStatus } from "../mcb/index.js";
 import {
-  formatMcbError,
-  getMcbStatus,
-  turnMcbOff,
-  turnMcbOn,
-} from "../mcb/index.js";
+  formatMcbLocalError,
+  turnMcbOffLocal,
+  turnMcbOnLocal,
+} from "../mcb-local/index.js";
 import { getCurrentMcbStatus, getSystemState } from "../monitoring/index.js";
 import { getLastDoorStatus, getLastTemperature } from "../mqtt/index.js";
 import { sendCustomNotification } from "../notifications/index.js";
@@ -123,19 +123,19 @@ routes.get("/api/mcb/status", async (c) => {
  */
 routes.post("/api/mcb/on", async (c) => {
   const requestId = c.get("requestId");
-  log.info({ requestId }, "POST /api/mcb/on");
+  log.info({ requestId }, "POST /api/mcb/on (via local tuyapi)");
 
-  const result = await turnMcbOn();
+  const result = await turnMcbOnLocal();
 
   if (result.isErr()) {
     log.error(
-      { requestId, error: formatMcbError(result.error) },
+      { requestId, error: formatMcbLocalError(result.error) },
       "Failed to turn MCB ON",
     );
     return c.json(
       {
         success: false,
-        message: formatMcbError(result.error),
+        message: formatMcbLocalError(result.error),
         requestId,
       },
       500,
@@ -160,19 +160,19 @@ routes.post("/api/mcb/on", async (c) => {
  */
 routes.post("/api/mcb/off", async (c) => {
   const requestId = c.get("requestId");
-  log.info({ requestId }, "POST /api/mcb/off");
+  log.info({ requestId }, "POST /api/mcb/off (via local tuyapi)");
 
-  const result = await turnMcbOff();
+  const result = await turnMcbOffLocal();
 
   if (result.isErr()) {
     log.error(
-      { requestId, error: formatMcbError(result.error) },
+      { requestId, error: formatMcbLocalError(result.error) },
       "Failed to turn MCB OFF",
     );
     return c.json(
       {
         success: false,
-        message: formatMcbError(result.error),
+        message: formatMcbLocalError(result.error),
         requestId,
       },
       500,
@@ -371,10 +371,10 @@ routes.post("/api/flic/toggle", async (c) => {
   const currentStatus = getCurrentMcbStatus();
   const targetOn = currentStatus !== "ON";
 
-  const result = targetOn ? await turnMcbOn() : await turnMcbOff();
+  const result = targetOn ? await turnMcbOnLocal() : await turnMcbOffLocal();
 
   if (result.isErr()) {
-    return c.json({ success: false, error: formatMcbError(result.error) }, 500);
+    return c.json({ success: false, error: formatMcbLocalError(result.error) }, 500);
   }
 
   broadcastMcbStatus(targetOn ? "ON" : "OFF", "flic");
@@ -392,10 +392,10 @@ routes.post("/api/flic/on", async (c) => {
   const requestId = c.get("requestId");
   log.info({ requestId }, "Flic force ON triggered");
 
-  const result = await turnMcbOn();
+  const result = await turnMcbOnLocal();
 
   if (result.isErr()) {
-    return c.json({ success: false, error: formatMcbError(result.error) }, 500);
+    return c.json({ success: false, error: formatMcbLocalError(result.error) }, 500);
   }
 
   broadcastMcbStatus("ON", "flic");
@@ -409,10 +409,10 @@ routes.post("/api/flic/off", async (c) => {
   const requestId = c.get("requestId");
   log.info({ requestId }, "Flic force OFF triggered");
 
-  const result = await turnMcbOff();
+  const result = await turnMcbOffLocal();
 
   if (result.isErr()) {
-    return c.json({ success: false, error: formatMcbError(result.error) }, 500);
+    return c.json({ success: false, error: formatMcbLocalError(result.error) }, 500);
   }
 
   broadcastMcbStatus("OFF", "flic");

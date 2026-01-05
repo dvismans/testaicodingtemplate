@@ -13,7 +13,6 @@ import { config, mqttTopics } from "../config.js";
 import { createLogger } from "../logger.js";
 import type {
   FlicButtonEvent,
-  McbMqttStatus,
   MqttPhaseData,
   SaunaDoorStatus,
   SaunaTemperature,
@@ -27,7 +26,6 @@ import {
   getMessageType,
   parseDoorMessage,
   parseFlicMessage,
-  parseMcbMessage,
   parsePhaseValue,
   parseRuuviMessage,
   parseVentilatorMessage,
@@ -45,6 +43,7 @@ let sensorState: SensorState = INITIAL_SENSOR_STATE;
 
 /**
  * Callback types for MQTT events.
+ * Note: MCB status now comes from local tuyapi, not MQTT.
  */
 export type MqttEventHandlers = {
   onTemperature?: (data: SaunaTemperature) => void;
@@ -52,7 +51,7 @@ export type MqttEventHandlers = {
   onVentilator?: (data: VentilatorMqttStatus) => void;
   onPhase?: (data: MqttPhaseData) => void;
   onFlic?: (event: FlicButtonEvent) => void;
-  onMcb?: (data: McbMqttStatus) => void;
+  // onMcb removed - MCB status now from local tuyapi
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -99,12 +98,7 @@ export function getLastPhaseData(): MqttPhaseData | null {
   return sensorState.phase;
 }
 
-/**
- * Get last known MCB status from MQTT.
- */
-export function getLastMcbStatus(): McbMqttStatus | null {
-  return sensorState.mcb;
-}
+// getLastMcbStatus removed - MCB status now from local tuyapi
 
 // =============================================================================
 // MQTT Client Management
@@ -181,6 +175,7 @@ function setupClientHandlers(client: MqttClient): void {
 
 /**
  * Subscribe to configured MQTT topics.
+ * Note: MCB status now comes from local tuyapi, not MQTT.
  */
 function subscribeToTopics(client: MqttClient): void {
   const topics = [
@@ -189,7 +184,7 @@ function subscribeToTopics(client: MqttClient): void {
     mqttTopics.ventilator,
     mqttTopics.flic,
     mqttTopics.phase,
-    mqttTopics.mcb,
+    // MCB topic removed - status now from local tuyapi
   ];
 
   for (const topic of topics) {
@@ -306,25 +301,7 @@ function handleMessage(topic: string, payload: Buffer): void {
       break;
     }
 
-    case "mcb": {
-      const data = parseMcbMessage(topic, payload, sensorState.mcb, now);
-      if (data) {
-        const statusChanged = sensorState.mcb?.isOn !== data.isOn;
-        sensorState = { ...sensorState, mcb: data };
-
-        if (statusChanged) {
-          log.info(
-            { isOn: data.isOn, voltage: data.voltage },
-            "MCB status changed via MQTT",
-          );
-        } else {
-          log.debug({ isOn: data.isOn, voltage: data.voltage }, "MCB update");
-        }
-
-        eventHandlers.onMcb?.(data);
-      }
-      break;
-    }
+    // MCB case removed - status now from local tuyapi
 
     default:
       log.debug({ topic }, "Unknown message type");

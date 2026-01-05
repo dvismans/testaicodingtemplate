@@ -12,9 +12,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 // Mock the service layer modules BEFORE importing routes
 vi.mock("../../mcb/index.js", () => ({
   getMcbStatus: vi.fn(),
-  turnMcbOn: vi.fn(),
-  turnMcbOff: vi.fn(),
   formatMcbError: vi.fn((err) => err.message || "Unknown error"),
+}));
+
+vi.mock("../../mcb-local/index.js", () => ({
+  turnMcbOnLocal: vi.fn(),
+  turnMcbOffLocal: vi.fn(),
+  formatMcbLocalError: vi.fn((err) => err.message || "Unknown error"),
 }));
 
 vi.mock("../../notifications/index.js", () => ({
@@ -113,7 +117,8 @@ vi.mock("../../logger.js", () => ({
 // Now import the modules (after mocks are set up)
 import { err, ok } from "neverthrow";
 import { getNotificationConfig, getVentilatorConfig } from "../../config.js";
-import { getMcbStatus, turnMcbOff, turnMcbOn } from "../../mcb/index.js";
+import { getMcbStatus } from "../../mcb/index.js";
+import { turnMcbOffLocal, turnMcbOnLocal } from "../../mcb-local/index.js";
 import { getCurrentMcbStatus, getSystemState } from "../../monitoring/index.js";
 import { getLastDoorStatus, getLastTemperature } from "../../mqtt/index.js";
 import { sendCustomNotification } from "../../notifications/index.js";
@@ -277,7 +282,7 @@ describe("API Routes", () => {
   describe("POST /api/mcb/on", () => {
     test("returns success when MCB turns on successfully", async () => {
       // Arrange
-      vi.mocked(turnMcbOn).mockResolvedValue(ok(true));
+      vi.mocked(turnMcbOnLocal).mockResolvedValue(ok(true));
 
       // Act
       const res = await app.request("/api/mcb/on", { method: "POST" });
@@ -287,16 +292,16 @@ describe("API Routes", () => {
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.status).toBe("ON");
-      expect(turnMcbOn).toHaveBeenCalledTimes(1);
+      expect(turnMcbOnLocal).toHaveBeenCalledTimes(1);
     });
 
-    test("returns error status when Tuya Cloud API fails", async () => {
+    test("returns error status when command fails", async () => {
       // Arrange
-      vi.mocked(turnMcbOn).mockResolvedValue(
+      vi.mocked(turnMcbOnLocal).mockResolvedValue(
         err({
           type: "COMMAND_FAILED",
-          message: "Tuya API timeout",
-          command: "TURN_ON",
+          message: "Device timeout",
+          command: "on",
         }),
       );
 
@@ -309,10 +314,10 @@ describe("API Routes", () => {
       expect(body.success).toBe(false);
     });
 
-    test("returns error status when authentication fails", async () => {
+    test("returns error status when connection fails", async () => {
       // Arrange
-      vi.mocked(turnMcbOn).mockResolvedValue(
-        err({ type: "AUTH_FAILED", message: "Invalid access token" }),
+      vi.mocked(turnMcbOnLocal).mockResolvedValue(
+        err({ type: "CONNECTION_FAILED", message: "MCB not reachable" }),
       );
 
       // Act
@@ -332,7 +337,7 @@ describe("API Routes", () => {
   describe("POST /api/mcb/off", () => {
     test("returns success when MCB turns off successfully", async () => {
       // Arrange
-      vi.mocked(turnMcbOff).mockResolvedValue(ok(true));
+      vi.mocked(turnMcbOffLocal).mockResolvedValue(ok(true));
 
       // Act
       const res = await app.request("/api/mcb/off", { method: "POST" });
@@ -342,13 +347,13 @@ describe("API Routes", () => {
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.status).toBe("OFF");
-      expect(turnMcbOff).toHaveBeenCalledTimes(1);
+      expect(turnMcbOffLocal).toHaveBeenCalledTimes(1);
     });
 
     test("returns error status when command fails", async () => {
       // Arrange
-      vi.mocked(turnMcbOff).mockResolvedValue(
-        err({ type: "NETWORK_ERROR", message: "Connection timeout" }),
+      vi.mocked(turnMcbOffLocal).mockResolvedValue(
+        err({ type: "CONNECTION_FAILED", message: "Connection timeout" }),
       );
 
       // Act
@@ -599,7 +604,7 @@ describe("API Routes", () => {
     test("turns MCB ON when currently OFF", async () => {
       // Arrange
       vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
-      vi.mocked(turnMcbOn).mockResolvedValue(ok(true));
+      vi.mocked(turnMcbOnLocal).mockResolvedValue(ok(true));
 
       // Act
       const res = await app.request("/api/flic/toggle", { method: "POST" });
@@ -609,14 +614,14 @@ describe("API Routes", () => {
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.status).toBe("ON");
-      expect(turnMcbOn).toHaveBeenCalledTimes(1);
-      expect(turnMcbOff).not.toHaveBeenCalled();
+      expect(turnMcbOnLocal).toHaveBeenCalledTimes(1);
+      expect(turnMcbOffLocal).not.toHaveBeenCalled();
     });
 
     test("turns MCB OFF when currently ON", async () => {
       // Arrange
       vi.mocked(getCurrentMcbStatus).mockReturnValue("ON");
-      vi.mocked(turnMcbOff).mockResolvedValue(ok(true));
+      vi.mocked(turnMcbOffLocal).mockResolvedValue(ok(true));
 
       // Act
       const res = await app.request("/api/flic/toggle", { method: "POST" });
@@ -626,15 +631,15 @@ describe("API Routes", () => {
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.status).toBe("OFF");
-      expect(turnMcbOff).toHaveBeenCalledTimes(1);
-      expect(turnMcbOn).not.toHaveBeenCalled();
+      expect(turnMcbOffLocal).toHaveBeenCalledTimes(1);
+      expect(turnMcbOnLocal).not.toHaveBeenCalled();
     });
 
     test("returns error when toggle fails", async () => {
       // Arrange
       vi.mocked(getCurrentMcbStatus).mockReturnValue("OFF");
-      vi.mocked(turnMcbOn).mockResolvedValue(
-        err({ type: "NETWORK_ERROR", message: "Connection failed" }),
+      vi.mocked(turnMcbOnLocal).mockResolvedValue(
+        err({ type: "CONNECTION_FAILED", message: "Connection failed" }),
       );
 
       // Act
@@ -654,7 +659,7 @@ describe("API Routes", () => {
   describe("POST /api/flic/on", () => {
     test("forces MCB ON", async () => {
       // Arrange
-      vi.mocked(turnMcbOn).mockResolvedValue(ok(true));
+      vi.mocked(turnMcbOnLocal).mockResolvedValue(ok(true));
 
       // Act
       const res = await app.request("/api/flic/on", { method: "POST" });
@@ -668,8 +673,8 @@ describe("API Routes", () => {
 
     test("returns error when force ON fails", async () => {
       // Arrange
-      vi.mocked(turnMcbOn).mockResolvedValue(
-        err({ type: "AUTH_FAILED", message: "Invalid token" }),
+      vi.mocked(turnMcbOnLocal).mockResolvedValue(
+        err({ type: "CONNECTION_FAILED", message: "Device unreachable" }),
       );
 
       // Act
@@ -689,7 +694,7 @@ describe("API Routes", () => {
   describe("POST /api/flic/off", () => {
     test("forces MCB OFF", async () => {
       // Arrange
-      vi.mocked(turnMcbOff).mockResolvedValue(ok(true));
+      vi.mocked(turnMcbOffLocal).mockResolvedValue(ok(true));
 
       // Act
       const res = await app.request("/api/flic/off", { method: "POST" });
@@ -703,10 +708,10 @@ describe("API Routes", () => {
 
     test("returns error when force OFF fails", async () => {
       // Arrange
-      vi.mocked(turnMcbOff).mockResolvedValue(
+      vi.mocked(turnMcbOffLocal).mockResolvedValue(
         err({
           type: "COMMAND_FAILED",
-          command: "TURN_OFF",
+          command: "off",
           message: "Device offline",
         }),
       );

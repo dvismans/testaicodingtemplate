@@ -50,20 +50,39 @@ const ConfigSchema = z.object({
     .describe("Pino log level"),
 
   // ==========================================================================
-  // MCB Device Configuration
+  // MCB Device Configuration (Local tuyapi)
   // ==========================================================================
   MCB_DEVICE_ID: z
     .string()
     .min(1, "MCB_DEVICE_ID is required")
     .describe("Tuya device ID for MCB"),
+  MCB_DEVICE_IP: z
+    .string()
+    .ip()
+    .describe("MCB device local IP address for direct tuyapi communication"),
+  MCB_LOCAL_KEY: z
+    .string()
+    .min(1, "MCB_LOCAL_KEY is required")
+    .describe("Tuya device local key for encryption"),
+  MCB_PROTOCOL_VERSION: z
+    .string()
+    .default("3.3")
+    .describe("Tuya protocol version (usually 3.3 or 3.4)"),
+  MCB_POLL_INTERVAL_MS: z.coerce
+    .number()
+    .positive()
+    .default(5000)
+    .describe("How often to poll MCB status locally (ms)"),
+  /** @deprecated Use local tuyapi instead - kept for backward compatibility */
   MCB_LOCAL_API_URL: z
     .string()
     .url()
+    .optional()
     .default("http://127.0.0.1:8091")
-    .describe("Python MCB Local API endpoint for status polling"),
+    .describe("(Deprecated) Python MCB Local API endpoint"),
 
   // ==========================================================================
-  // Tuya Cloud API Configuration
+  // Tuya Cloud API Configuration (fallback/remote control)
   // ==========================================================================
   TUYA_ACCESS_ID: z
     .string()
@@ -242,6 +261,25 @@ export function getNotificationConfig(): Readonly<{
     serverUrl: config.WAHA_SERVER,
     apiKey: config.WAHA_API_KEY,
     phoneNumber: config.NOTIFICATION_PHONE,
+  };
+}
+
+/**
+ * MCB local device configuration for tuyapi.
+ */
+export function getMcbLocalConfig(): Readonly<{
+  deviceId: string;
+  deviceIp: string;
+  localKey: string;
+  protocolVersion: string;
+  pollIntervalMs: number;
+}> {
+  return {
+    deviceId: config.MCB_DEVICE_ID,
+    deviceIp: config.MCB_DEVICE_IP,
+    localKey: config.MCB_LOCAL_KEY,
+    protocolVersion: config.MCB_PROTOCOL_VERSION,
+    pollIntervalMs: config.MCB_POLL_INTERVAL_MS,
   };
 }
 

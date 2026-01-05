@@ -13,16 +13,22 @@ import {
   logOperationFailed,
   logOperationStart,
 } from "../logger.js";
-import { type McbStatus, turnMcbOff } from "../mcb/index.js";
+import type { McbStatus } from "../mcb/index.js";
+import {
+  type McbLocalStatus,
+  connectMcbLocal,
+  disconnectMcbLocal,
+  getLastMcbLocalStatus,
+  turnMcbOffLocal,
+  turnMcbOnLocal,
+} from "../mcb-local/index.js";
 import {
   type FlicButtonEvent,
-  type McbMqttStatus,
   type MqttPhaseData,
   type SaunaDoorStatus,
   type SaunaTemperature,
   disconnectMqttClient,
   getLastDoorStatus,
-  getLastMcbStatus,
   getLastPhaseData,
   getLastTemperature,
   initializeMqttClient,
@@ -101,8 +107,8 @@ async function triggerSafetyShutdown(triggerPhases: string[]): Promise<void> {
   // Update state
   state = { ...state, lastSwitchOffTime: now };
 
-  // Turn off MCB via Tuya Cloud
-  const result = await turnMcbOff();
+  // Turn off MCB via local tuyapi
+  const result = await turnMcbOffLocal();
 
   if (result.isOk()) {
     state = { ...state, mcbStatus: "OFF" };
@@ -190,16 +196,15 @@ async function handleFlicEvent(event: FlicButtonEvent): Promise<void> {
     targetOn = action === "on";
   }
 
-  // Import and call MCB control
+  // Call MCB control via local tuyapi
   if (targetOn) {
-    const { turnMcbOn } = await import("../mcb/index.js");
-    const result = await turnMcbOn();
+    const result = await turnMcbOnLocal();
     if (result.isOk()) {
       state = { ...state, mcbStatus: "ON" };
       broadcastMcbStatus("ON", "flic");
     }
   } else {
-    const result = await turnMcbOff();
+    const result = await turnMcbOffLocal();
     if (result.isOk()) {
       state = { ...state, mcbStatus: "OFF" };
       broadcastMcbStatus("OFF", "flic");
@@ -237,19 +242,19 @@ async function handlePhaseUpdate(data: MqttPhaseData): Promise<void> {
 }
 
 /**
- * Handle MCB status update from MQTT.
+ * Handle MCB status update from local tuyapi connection.
  */
-function handleMcbUpdate(data: McbMqttStatus): void {
+function handleMcbLocalUpdate(data: McbLocalStatus): void {
   const newStatus: McbStatus = data.isOn ? "ON" : "OFF";
   const previousStatus = state.mcbStatus;
 
   if (newStatus !== previousStatus) {
     log.info(
       { oldStatus: previousStatus, newStatus, voltage: data.voltage },
-      "MCB status changed via MQTT",
+      "MCB status changed via local tuyapi",
     );
     state = { ...state, mcbStatus: newStatus };
-    broadcastMcbStatus(newStatus, "mqtt");
+    broadcastMcbStatus(newStatus, "mqtt"); // Keep "mqtt" source for compatibility
 
     // Handle ventilator control when MCB turns off
     if (newStatus === "OFF" && previousStatus === "ON") {
@@ -262,23 +267,21 @@ function handleMcbUpdate(data: McbMqttStatus): void {
 
 /**
  * Single poll cycle.
- * Phase data AND MCB status now both come from MQTT - no HTTP polling needed.
+ * MCB status comes from local tuyapi, phase data from MQTT.
  */
 async function pollCycle(): Promise<void> {
   const now = Date.now();
 
-  // MCB status now comes from MQTT, update state from last known MQTT value
-  const mqttMcbStatus = getLastMcbStatus();
-  if (mqttMcbStatus) {
-    const newStatus: McbStatus = mqttMcbStatus.isOn ? "ON" : "OFF";
+  // MCB status handled by local tuyapi callback - just sync from last known value
+  const localMcbStatus = getLastMcbLocalStatus();
+  if (localMcbStatus) {
+    const newStatus: McbStatus = localMcbStatus.isOn ? "ON" : "OFF";
     if (newStatus !== state.mcbStatus) {
-      log.info({ oldStatus: state.mcbStatus, newStatus }, "MCB status changed");
       state = { ...state, mcbStatus: newStatus };
     }
   }
 
-  // Phase data now comes from MQTT, no HTTP polling needed
-  // Just update state with latest MQTT phase data if available
+  // Phase data comes from MQTT
   const mqttPhaseData = getLastPhaseData();
   if (mqttPhaseData) {
     state = {
@@ -307,7 +310,19 @@ export async function startMonitoringLoop(): Promise<void> {
   state = { ...state, isRunning: true };
   stopRequested = false;
 
-  // Initialize MQTT with event handlers
+  // Connect to MCB locally via tuyapi (replaces Python Tuya-MCB-API)
+  const mcbResult = await connectMcbLocal((status: McbLocalStatus) => {
+    handleMcbLocalUpdate(status);
+  });
+
+  if (mcbResult.isErr()) {
+    log.error(
+      { error: mcbResult.error.message },
+      "Failed to connect to MCB locally - continuing with MQTT only",
+    );
+  }
+
+  // Initialize MQTT with event handlers (sensors only, MCB status from local)
   initializeMqttClient({
     onTemperature: (data: SaunaTemperature) => {
       broadcastTemperature(data.temperature, data.humidity);
@@ -326,9 +341,6 @@ export async function startMonitoringLoop(): Promise<void> {
       handlePhaseUpdate(data).catch((err) => {
         log.error({ error: err }, "Failed to handle phase update");
       });
-    },
-    onMcb: (data: McbMqttStatus) => {
-      handleMcbUpdate(data);
     },
     onFlic: handleFlicEvent,
     onVentilator: (data) => {
@@ -366,6 +378,7 @@ export function stopMonitoringLoop(): void {
 
   log.info("Stopping monitoring loop...");
   stopRequested = true;
+  disconnectMcbLocal();
   disconnectMqttClient();
 }
 
