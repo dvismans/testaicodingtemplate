@@ -1,0 +1,182 @@
+# =============================================================================
+# Sauna Safety Automations
+# =============================================================================
+# These automations handle safety-critical functionality:
+# - Auto-shutdown on over-amperage
+# - Temperature alerts
+# - Cooldown management
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Safety Shutdown - Over-Amperage Detection
+# -----------------------------------------------------------------------------
+# Monitors all three phases and triggers MCB shutdown if any exceeds threshold.
+# Includes cooldown to prevent rapid on/off cycling.
+# -----------------------------------------------------------------------------
+- id: sauna_safety_shutdown
+  alias: "Sauna: Safety Shutdown on Over-Amperage"
+  description: "Auto-shutdown MCB when any phase exceeds amperage threshold"
+  mode: single
+  max_exceeded: silent
+  
+  trigger:
+    # Trigger when any phase exceeds threshold
+    - platform: template
+      value_template: >
+        {% set threshold = states('input_number.sauna_amperage_threshold') | float(25) %}
+        {% set l1 = states('sensor.p1_phase_l1_amperage') | float(0) %}
+        {% set l2 = states('sensor.p1_phase_l2_amperage') | float(0) %}
+        {% set l3 = states('sensor.p1_phase_l3_amperage') | float(0) %}
+        {{ l1 > threshold or l2 > threshold or l3 > threshold }}
+      for:
+        seconds: 1  # Debounce - must exceed for 1 second
+
+  condition:
+    # Must be enabled
+    - condition: state
+      entity_id: input_boolean.sauna_safety_shutdown_enabled
+      state: "on"
+    # MCB must be ON
+    - condition: state
+      entity_id: switch.sauna_mcb
+      state: "on"
+    # Not in cooldown
+    - condition: state
+      entity_id: timer.sauna_safety_cooldown
+      state: "idle"
+
+  action:
+    # Log the trigger
+    - service: system_log.write
+      data:
+        message: >
+          SAUNA SAFETY SHUTDOWN: Over-amperage detected.
+          L1: {{ states('sensor.p1_phase_l1_amperage') }}A,
+          L2: {{ states('sensor.p1_phase_l2_amperage') }}A,
+          L3: {{ states('sensor.p1_phase_l3_amperage') }}A.
+          Threshold: {{ states('input_number.sauna_amperage_threshold') }}A
+        level: warning
+        logger: homeassistant.sauna
+
+    # Turn OFF MCB
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_mcb
+
+    # Start cooldown timer
+    - service: timer.start
+      target:
+        entity_id: timer.sauna_safety_cooldown
+      data:
+        duration: "00:00:10"
+
+    # Record timestamp
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.sauna_last_safety_shutdown
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+    # Send WhatsApp notification (if enabled)
+    - condition: state
+      entity_id: input_boolean.sauna_notifications_enabled
+      state: "on"
+    - service: notify.whatsapp
+      data:
+        message: >
+          ⚠️ SAFETY ALERT: Sauna MCB automatically switched OFF due to high amperage.
+          
+          L1: {{ states('sensor.p1_phase_l1_amperage') }}A
+          L2: {{ states('sensor.p1_phase_l2_amperage') }}A  
+          L3: {{ states('sensor.p1_phase_l3_amperage') }}A
+          Threshold: {{ states('input_number.sauna_amperage_threshold') }}A
+          
+          Please check electrical load before switching back on.
+
+# -----------------------------------------------------------------------------
+# Temperature Alert
+# -----------------------------------------------------------------------------
+# Sends notification when sauna reaches target temperature (e.g., 85°C).
+# Includes cooldown to prevent notification spam.
+# -----------------------------------------------------------------------------
+- id: sauna_temperature_alert
+  alias: "Sauna: Temperature Alert"
+  description: "Notify when sauna reaches high temperature"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.sauna_temperature
+      above: input_number.sauna_temperature_alert_threshold
+
+  condition:
+    # Notifications enabled
+    - condition: state
+      entity_id: input_boolean.sauna_notifications_enabled
+      state: "on"
+    # Cooldown: at least 30 minutes since last alert
+    - condition: template
+      value_template: >
+        {% set last = states('input_datetime.sauna_last_temperature_alert') %}
+        {% if last == 'unknown' or last == 'unavailable' %}
+          true
+        {% else %}
+          {{ (now() - strptime(last, '%Y-%m-%d %H:%M:%S')).total_seconds() > 1800 }}
+        {% endif %}
+
+  action:
+    # Record timestamp
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.sauna_last_temperature_alert
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+    # Send notification
+    - service: notify.whatsapp
+      data:
+        message: >
+          🔥 Sauna temperature is now {{ states('sensor.sauna_temperature') }}°C
+          Humidity: {{ states('sensor.sauna_humidity') }}%
+
+# -----------------------------------------------------------------------------
+# Safety Shutdown Recovery Notification
+# -----------------------------------------------------------------------------
+# Notifies when MCB is manually turned back on after a safety shutdown.
+# -----------------------------------------------------------------------------
+- id: sauna_recovery_notification
+  alias: "Sauna: Recovery After Safety Shutdown"
+  description: "Notify when MCB is turned back on after safety shutdown"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: switch.sauna_mcb
+      from: "off"
+      to: "on"
+
+  condition:
+    # Only if last safety shutdown was within 1 hour
+    - condition: template
+      value_template: >
+        {% set last = states('input_datetime.sauna_last_safety_shutdown') %}
+        {% if last == 'unknown' or last == 'unavailable' %}
+          false
+        {% else %}
+          {{ (now() - strptime(last, '%Y-%m-%d %H:%M:%S')).total_seconds() < 3600 }}
+        {% endif %}
+    - condition: state
+      entity_id: input_boolean.sauna_notifications_enabled
+      state: "on"
+
+  action:
+    - service: notify.whatsapp
+      data:
+        message: >
+          ✅ Sauna MCB has been turned back ON.
+          Current amperage:
+          L1: {{ states('sensor.p1_phase_l1_amperage') }}A
+          L2: {{ states('sensor.p1_phase_l2_amperage') }}A
+          L3: {{ states('sensor.p1_phase_l3_amperage') }}A
+

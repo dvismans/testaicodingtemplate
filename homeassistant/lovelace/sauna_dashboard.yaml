@@ -1,0 +1,225 @@
+# =============================================================================
+# Sauna Control Dashboard - Lovelace Configuration
+# =============================================================================
+# This is a complete Lovelace view for the sauna control system.
+# 
+# To use this dashboard, you have two options:
+#
+# Option 1: Add as a view to your existing dashboard
+#   In your Lovelace configuration, add this under "views:"
+#
+# Option 2: Create a new dashboard
+#   Go to Settings > Dashboards > Add Dashboard > Create from YAML
+#   Then paste this configuration
+#
+# =============================================================================
+
+title: Sauna Control
+path: sauna
+icon: mdi:hot-tub
+type: panel
+
+cards:
+  - type: vertical-stack
+    cards:
+      # =========================================================================
+      # Phase Amperage Display
+      # =========================================================================
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            entity: sensor.p1_phase_l1_amperage
+            name: L1
+            min: 0
+            max: 32
+            severity:
+              green: 0
+              yellow: 20
+              red: 25
+            needle: true
+
+          - type: gauge
+            entity: sensor.p1_phase_l2_amperage
+            name: L2
+            min: 0
+            max: 32
+            severity:
+              green: 0
+              yellow: 20
+              red: 25
+            needle: true
+
+          - type: gauge
+            entity: sensor.p1_phase_l3_amperage
+            name: L3
+            min: 0
+            max: 32
+            severity:
+              green: 0
+              yellow: 20
+              red: 25
+            needle: true
+
+      # =========================================================================
+      # Temperature Display
+      # =========================================================================
+      - type: custom:mushroom-template-card
+        primary: "{{ states('sensor.sauna_temperature') }}°C"
+        secondary: "Humidity: {{ states('sensor.sauna_humidity') }}%"
+        icon: mdi:thermometer
+        icon_color: >
+          {% set temp = states('sensor.sauna_temperature') | float(0) %}
+          {% if temp > 80 %}red
+          {% elif temp > 60 %}orange
+          {% elif temp > 40 %}yellow
+          {% else %}blue
+          {% endif %}
+        layout: vertical
+        card_mod:
+          style: |
+            ha-card {
+              --primary-text-size: 3rem;
+              --secondary-text-size: 1rem;
+            }
+
+      # =========================================================================
+      # MCB Control Button (Fallback if Mushroom not installed)
+      # =========================================================================
+      - type: button
+        entity: switch.sauna_mcb
+        name: Sauna MCB
+        icon: mdi:power
+        show_state: true
+        tap_action:
+          action: toggle
+        hold_action:
+          action: call-service
+          service: script.sauna_emergency_shutdown
+          confirmation:
+            text: "Emergency shutdown - are you sure?"
+
+      # =========================================================================
+      # Status Indicators
+      # =========================================================================
+      - type: glance
+        show_name: true
+        show_state: true
+        show_icon: true
+        entities:
+          - entity: binary_sensor.sauna_door
+            name: Door
+          - entity: switch.sauna_ventilator
+            name: Ventilator
+          - entity: climate.sauna_floor_heating
+            name: Floor Heat
+          - entity: timer.sauna_ventilator_delay_off
+            name: Vent Timer
+
+      # =========================================================================
+      # Settings
+      # =========================================================================
+      - type: entities
+        title: Settings
+        show_header_toggle: false
+        entities:
+          - entity: input_number.sauna_amperage_threshold
+            name: Amperage Threshold
+          - entity: input_number.sauna_ventilator_delay_off_minutes
+            name: Ventilator Delay (min)
+          - entity: input_boolean.sauna_safety_shutdown_enabled
+            name: Safety Shutdown
+          - entity: input_boolean.sauna_notifications_enabled
+            name: Notifications
+
+      # =========================================================================
+      # Quick Actions
+      # =========================================================================
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Test Notification
+            icon: mdi:message-text
+            tap_action:
+              action: call-service
+              service: script.sauna_test_notification
+
+          - type: button
+            name: Status
+            icon: mdi:information
+            tap_action:
+              action: call-service
+              service: script.sauna_status_summary
+
+          - type: button
+            name: Emergency Stop
+            icon: mdi:alert-octagon
+            icon_color: red
+            tap_action:
+              action: call-service
+              service: script.sauna_emergency_shutdown
+              confirmation:
+                text: "Emergency shutdown?"
+
+---
+# =============================================================================
+# Alternative: Cards for Existing Dashboard
+# =============================================================================
+# If you want to add individual cards to an existing dashboard,
+# here are the cards separately:
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Compact Sauna Card (single card with all info)
+# -----------------------------------------------------------------------------
+# type: custom:stack-in-card
+# cards:
+#   - type: custom:mushroom-entity-card
+#     entity: switch.sauna_mcb
+#     name: Sauna
+#     icon: mdi:hot-tub
+#     tap_action:
+#       action: toggle
+#     secondary_info: state
+#   - type: grid
+#     columns: 3
+#     square: false
+#     cards:
+#       - type: sensor
+#         entity: sensor.p1_phase_l1_amperage
+#         name: L1
+#         graph: none
+#       - type: sensor
+#         entity: sensor.p1_phase_l2_amperage
+#         name: L2
+#         graph: none
+#       - type: sensor
+#         entity: sensor.p1_phase_l3_amperage
+#         name: L3
+#         graph: none
+
+# -----------------------------------------------------------------------------
+# Temperature History Graph
+# -----------------------------------------------------------------------------
+# type: history-graph
+# title: Sauna Temperature
+# hours_to_show: 24
+# entities:
+#   - entity: sensor.sauna_temperature
+#     name: Temperature
+#   - entity: sensor.sauna_humidity
+#     name: Humidity
+
+# -----------------------------------------------------------------------------
+# Phase Amperage History
+# -----------------------------------------------------------------------------
+# type: history-graph
+# title: Phase Amperage
+# hours_to_show: 2
+# entities:
+#   - entity: sensor.p1_phase_l1_amperage
+#     name: L1
+#   - entity: sensor.p1_phase_l2_amperage
+#     name: L2
+#   - entity: sensor.p1_phase_l3_amperage
+#     name: L3
+

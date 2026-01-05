@@ -1,0 +1,155 @@
+# =============================================================================
+# Sauna Control Scripts
+# =============================================================================
+# Reusable scripts for sauna control actions.
+# Can be called from automations, UI, or voice assistants.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Toggle Sauna MCB
+# -----------------------------------------------------------------------------
+sauna_toggle:
+  alias: "Sauna: Toggle MCB"
+  description: "Toggle the sauna MCB on/off"
+  icon: mdi:power
+  mode: single
+  sequence:
+    - service: switch.toggle
+      target:
+        entity_id: switch.sauna_mcb
+
+# -----------------------------------------------------------------------------
+# Turn Sauna ON
+# -----------------------------------------------------------------------------
+sauna_on:
+  alias: "Sauna: Turn ON"
+  description: "Turn the sauna MCB on"
+  icon: mdi:power-plug
+  mode: single
+  sequence:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.sauna_mcb
+
+# -----------------------------------------------------------------------------
+# Turn Sauna OFF
+# -----------------------------------------------------------------------------
+sauna_off:
+  alias: "Sauna: Turn OFF"
+  description: "Turn the sauna MCB off"
+  icon: mdi:power-plug-off
+  mode: single
+  sequence:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_mcb
+
+# -----------------------------------------------------------------------------
+# Emergency Shutdown
+# -----------------------------------------------------------------------------
+# Turns off MCB and ventilator immediately, cancels all timers.
+# -----------------------------------------------------------------------------
+sauna_emergency_shutdown:
+  alias: "Sauna: Emergency Shutdown"
+  description: "Immediately turn off MCB and ventilator"
+  icon: mdi:alert-octagon
+  mode: single
+  sequence:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_mcb
+    - service: timer.cancel
+      target:
+        entity_id: timer.sauna_ventilator_delay_off
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_ventilator
+    - condition: state
+      entity_id: input_boolean.sauna_floor_heating_control_enabled
+      state: "on"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.sauna_floor_heating
+      data:
+        temperature: "{{ states('input_number.sauna_floor_heating_temp_off') | int }}"
+    - service: system_log.write
+      data:
+        message: "EMERGENCY SHUTDOWN executed"
+        level: warning
+        logger: homeassistant.sauna
+
+# -----------------------------------------------------------------------------
+# Ventilator Control Scripts
+# -----------------------------------------------------------------------------
+sauna_ventilator_on:
+  alias: "Sauna: Ventilator ON"
+  description: "Turn ventilator on"
+  icon: mdi:fan
+  mode: single
+  sequence:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.sauna_ventilator
+
+sauna_ventilator_off:
+  alias: "Sauna: Ventilator OFF"
+  description: "Turn ventilator off and cancel delayed timer"
+  icon: mdi:fan-off
+  mode: single
+  sequence:
+    - service: timer.cancel
+      target:
+        entity_id: timer.sauna_ventilator_delay_off
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_ventilator
+
+# -----------------------------------------------------------------------------
+# Send Test Notification
+# -----------------------------------------------------------------------------
+sauna_test_notification:
+  alias: "Sauna: Test Notification"
+  description: "Send a test WhatsApp notification"
+  icon: mdi:message-text
+  mode: single
+  sequence:
+    - service: notify.whatsapp
+      data:
+        message: >
+          🧪 Test notification from Home Assistant Sauna Control
+          
+          MCB: {{ states('switch.sauna_mcb') | upper }}
+          Temperature: {{ states('sensor.sauna_temperature') }}°C
+          Door: {{ 'Open' if is_state('binary_sensor.sauna_door', 'on') else 'Closed' }}
+          
+          Phase L1: {{ states('sensor.p1_phase_l1_amperage') }}A
+          Phase L2: {{ states('sensor.p1_phase_l2_amperage') }}A
+          Phase L3: {{ states('sensor.p1_phase_l3_amperage') }}A
+
+# -----------------------------------------------------------------------------
+# Get Status Summary
+# -----------------------------------------------------------------------------
+sauna_status_summary:
+  alias: "Sauna: Status Summary"
+  description: "Log current sauna status"
+  icon: mdi:information
+  mode: single
+  sequence:
+    - service: system_log.write
+      data:
+        message: >
+          Sauna Status:
+          MCB: {{ states('switch.sauna_mcb') }}
+          Temperature: {{ states('sensor.sauna_temperature') }}°C
+          Humidity: {{ states('sensor.sauna_humidity') }}%
+          Door: {{ states('binary_sensor.sauna_door') }}
+          Ventilator: {{ states('switch.sauna_ventilator') }}
+          Ventilator Timer: {{ states('timer.sauna_ventilator_delay_off') }}
+          Phase L1: {{ states('sensor.p1_phase_l1_amperage') }}A
+          Phase L2: {{ states('sensor.p1_phase_l2_amperage') }}A
+          Phase L3: {{ states('sensor.p1_phase_l3_amperage') }}A
+          Max Phase: {{ states('sensor.sauna_phase_max_amperage') }}A
+          Threshold: {{ states('input_number.sauna_amperage_threshold') }}A
+        level: info
+        logger: homeassistant.sauna
+

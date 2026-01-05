@@ -412,6 +412,20 @@ export async function startMonitoringLoop(): Promise<void> {
         { error: floorResult.error.message },
         "Failed to connect to floor heating - continuing without floor heating control",
       );
+    } else {
+      // Sync floor heating state on startup based on MCB status
+      const mcbStatus = getLastMcbLocalStatus();
+      if (mcbStatus && !mcbStatus.isOn) {
+        log.info("MCB is OFF on startup - setting floor heating to standby");
+        handleMcbOffFloorHeating().catch((err) => {
+          log.error({ error: err }, "Failed to sync floor heating on startup");
+        });
+      } else if (mcbStatus?.isOn) {
+        log.info("MCB is ON on startup - setting floor heating to target temp");
+        handleMcbOnFloorHeating().catch((err) => {
+          log.error({ error: err }, "Failed to sync floor heating on startup");
+        });
+      }
     }
   }
 

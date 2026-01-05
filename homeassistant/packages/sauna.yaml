@@ -1,0 +1,276 @@
+# =============================================================================
+# Sauna Control System - Home Assistant Package
+# =============================================================================
+# This package consolidates all sauna-related configuration.
+# Include this in your configuration.yaml:
+#
+#   homeassistant:
+#     packages:
+#       sauna: !include packages/sauna.yaml
+#
+# Or copy sections to your existing configuration files.
+# =============================================================================
+
+# =============================================================================
+# Input Numbers - Configurable Thresholds
+# =============================================================================
+input_number:
+  sauna_amperage_threshold:
+    name: Sauna Amperage Threshold
+    min: 10
+    max: 32
+    step: 1
+    unit_of_measurement: "A"
+    icon: mdi:flash-alert
+    initial: 25
+
+  sauna_floor_heating_temp_on:
+    name: Floor Heating Temp (Sauna ON)
+    min: 15
+    max: 30
+    step: 1
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+    initial: 21
+
+  sauna_floor_heating_temp_off:
+    name: Floor Heating Temp (Sauna OFF)
+    min: 5
+    max: 20
+    step: 1
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-low
+    initial: 5
+
+  sauna_ventilator_delay_off_minutes:
+    name: Ventilator Delay Off
+    min: 15
+    max: 120
+    step: 5
+    unit_of_measurement: "min"
+    icon: mdi:timer
+    initial: 60
+
+  sauna_temperature_alert_threshold:
+    name: Temperature Alert Threshold
+    min: 70
+    max: 100
+    step: 1
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-alert
+    initial: 85
+
+# =============================================================================
+# Input Booleans - Feature Flags
+# =============================================================================
+input_boolean:
+  sauna_safety_shutdown_enabled:
+    name: Safety Shutdown Enabled
+    icon: mdi:shield-check
+    initial: true
+
+  sauna_notifications_enabled:
+    name: Notifications Enabled
+    icon: mdi:bell
+    initial: true
+
+  sauna_floor_heating_control_enabled:
+    name: Floor Heating Control Enabled
+    icon: mdi:radiator
+    initial: true
+
+  sauna_ventilator_control_enabled:
+    name: Ventilator Control Enabled
+    icon: mdi:fan
+    initial: true
+
+# =============================================================================
+# Input Datetimes - Cooldown Tracking
+# =============================================================================
+input_datetime:
+  sauna_last_safety_shutdown:
+    name: Last Safety Shutdown
+    has_date: true
+    has_time: true
+
+  sauna_last_temperature_alert:
+    name: Last Temperature Alert
+    has_date: true
+    has_time: true
+
+# =============================================================================
+# Timers
+# =============================================================================
+timer:
+  sauna_ventilator_delay_off:
+    name: Ventilator Delayed Off
+    icon: mdi:timer-outline
+    duration: "01:00:00"
+
+  sauna_safety_cooldown:
+    name: Safety Shutdown Cooldown
+    icon: mdi:timer-sand
+    duration: "00:00:10"
+
+# =============================================================================
+# MQTT Sensors - P1 Monitor Phase Data
+# =============================================================================
+mqtt:
+  sensor:
+    # Phase amperage sensors from P1 Monitor
+    - name: "P1 Phase L1 Amperage"
+      unique_id: p1_phase_l1_amperage
+      state_topic: "p1monitor/phase/l1_a"
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      icon: mdi:flash
+
+    - name: "P1 Phase L2 Amperage"
+      unique_id: p1_phase_l2_amperage
+      state_topic: "p1monitor/phase/l2_a"
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      icon: mdi:flash
+
+    - name: "P1 Phase L3 Amperage"
+      unique_id: p1_phase_l3_amperage
+      state_topic: "p1monitor/phase/l3_a"
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      icon: mdi:flash
+
+    # Ruuvi Temperature Sensor
+    - name: "Sauna Temperature"
+      unique_id: sauna_ruuvi_temperature
+      state_topic: "homelab/sensors/sauna/ruuvi/status"
+      value_template: "{{ value_json.temp | round(1) }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      icon: mdi:thermometer
+
+    - name: "Sauna Humidity"
+      unique_id: sauna_ruuvi_humidity
+      state_topic: "homelab/sensors/sauna/ruuvi/status"
+      value_template: "{{ value_json.humidity | round(0) }}"
+      unit_of_measurement: "%"
+      device_class: humidity
+      state_class: measurement
+      icon: mdi:water-percent
+
+    - name: "Sauna Ruuvi Battery"
+      unique_id: sauna_ruuvi_battery
+      state_topic: "homelab/sensors/sauna/ruuvi/status"
+      value_template: "{{ value_json.batt }}"
+      unit_of_measurement: "mV"
+      device_class: voltage
+      state_class: measurement
+      icon: mdi:battery
+
+  binary_sensor:
+    # Door Sensor
+    - name: "Sauna Door"
+      unique_id: sauna_door
+      state_topic: "homelab/sensors/sauna/door/status"
+      value_template: "{{ value_json.Window }}"
+      payload_on: 1
+      payload_off: 0
+      device_class: door
+      icon: mdi:door
+
+# =============================================================================
+# Template Sensors - Derived Values
+# =============================================================================
+template:
+  - sensor:
+      - name: "Sauna Phase Max Amperage"
+        unique_id: sauna_phase_max_amperage
+        unit_of_measurement: "A"
+        device_class: current
+        state: >
+          {% set l1 = states('sensor.p1_phase_l1_amperage') | float(0) %}
+          {% set l2 = states('sensor.p1_phase_l2_amperage') | float(0) %}
+          {% set l3 = states('sensor.p1_phase_l3_amperage') | float(0) %}
+          {{ [l1, l2, l3] | max | round(1) }}
+        attributes:
+          l1: "{{ states('sensor.p1_phase_l1_amperage') | float(0) }}"
+          l2: "{{ states('sensor.p1_phase_l2_amperage') | float(0) }}"
+          l3: "{{ states('sensor.p1_phase_l3_amperage') | float(0) }}"
+
+      - name: "Sauna Amperage Over Threshold"
+        unique_id: sauna_amperage_over_threshold
+        state: >
+          {% set threshold = states('input_number.sauna_amperage_threshold') | float(25) %}
+          {% set l1 = states('sensor.p1_phase_l1_amperage') | float(0) %}
+          {% set l2 = states('sensor.p1_phase_l2_amperage') | float(0) %}
+          {% set l3 = states('sensor.p1_phase_l3_amperage') | float(0) %}
+          {% set exceeds = [] %}
+          {% if l1 > threshold %}{% set exceeds = exceeds + ['L1'] %}{% endif %}
+          {% if l2 > threshold %}{% set exceeds = exceeds + ['L2'] %}{% endif %}
+          {% if l3 > threshold %}{% set exceeds = exceeds + ['L3'] %}{% endif %}
+          {{ exceeds | join(', ') if exceeds else 'OK' }}
+
+      - name: "Sauna Ventilator Delay Remaining"
+        unique_id: sauna_ventilator_delay_remaining
+        unit_of_measurement: "min"
+        state: >
+          {% if is_state('timer.sauna_ventilator_delay_off', 'active') %}
+            {% set remaining = state_attr('timer.sauna_ventilator_delay_off', 'remaining') %}
+            {% if remaining %}
+              {{ (remaining.split(':')[0] | int * 60 + remaining.split(':')[1] | int) }}
+            {% else %}
+              0
+            {% endif %}
+          {% else %}
+            0
+          {% endif %}
+
+  - binary_sensor:
+      - name: "Sauna MCB"
+        unique_id: sauna_mcb_state
+        device_class: power
+        state: "{{ is_state('switch.sauna_mcb', 'on') }}"
+        icon: >
+          {% if is_state('switch.sauna_mcb', 'on') %}
+            mdi:power-plug
+          {% else %}
+            mdi:power-plug-off
+          {% endif %}
+
+      - name: "Sauna Amperage Alert"
+        unique_id: sauna_amperage_alert
+        device_class: problem
+        state: >
+          {% set threshold = states('input_number.sauna_amperage_threshold') | float(25) %}
+          {% set l1 = states('sensor.p1_phase_l1_amperage') | float(0) %}
+          {% set l2 = states('sensor.p1_phase_l2_amperage') | float(0) %}
+          {% set l3 = states('sensor.p1_phase_l3_amperage') | float(0) %}
+          {{ l1 > threshold or l2 > threshold or l3 > threshold }}
+
+# =============================================================================
+# Groups
+# =============================================================================
+group:
+  sauna_phase_sensors:
+    name: Sauna Phase Sensors
+    entities:
+      - sensor.p1_phase_l1_amperage
+      - sensor.p1_phase_l2_amperage
+      - sensor.p1_phase_l3_amperage
+
+  sauna_all_sensors:
+    name: Sauna All Sensors
+    entities:
+      - switch.sauna_mcb
+      - sensor.sauna_temperature
+      - sensor.sauna_humidity
+      - binary_sensor.sauna_door
+      - switch.sauna_ventilator
+      - climate.sauna_floor_heating
+      - sensor.p1_phase_l1_amperage
+      - sensor.p1_phase_l2_amperage
+      - sensor.p1_phase_l3_amperage
+

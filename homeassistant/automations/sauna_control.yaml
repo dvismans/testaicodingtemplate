@@ -1,0 +1,203 @@
+# =============================================================================
+# Sauna Control Automations
+# =============================================================================
+# These automations handle:
+# - Ventilator control (delayed off after MCB off)
+# - Floor heating coordination with sauna state
+# - Keep-alive for ventilator
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# MCB Turned ON - Start Ventilator and Floor Heating
+# -----------------------------------------------------------------------------
+- id: sauna_mcb_on_actions
+  alias: "Sauna: MCB Turned ON Actions"
+  description: "Start ventilator and adjust floor heating when sauna turns on"
+  mode: restart
+
+  trigger:
+    - platform: state
+      entity_id: switch.sauna_mcb
+      from: "off"
+      to: "on"
+
+  action:
+    # Cancel any pending delayed off timer
+    - service: timer.cancel
+      target:
+        entity_id: timer.sauna_ventilator_delay_off
+
+    # Turn on ventilator (if enabled)
+    - condition: state
+      entity_id: input_boolean.sauna_ventilator_control_enabled
+      state: "on"
+    - service: switch.turn_on
+      target:
+        entity_id: switch.sauna_ventilator
+
+    # Set floor heating to "sauna on" temperature (if enabled)
+    - condition: state
+      entity_id: input_boolean.sauna_floor_heating_control_enabled
+      state: "on"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.sauna_floor_heating
+      data:
+        temperature: "{{ states('input_number.sauna_floor_heating_temp_on') | int }}"
+
+    # Log
+    - service: system_log.write
+      data:
+        message: "Sauna MCB turned ON - ventilator activated, floor heating set to {{ states('input_number.sauna_floor_heating_temp_on') }}°C"
+        level: info
+        logger: homeassistant.sauna
+
+# -----------------------------------------------------------------------------
+# MCB Turned OFF - Schedule Ventilator Delayed Off
+# -----------------------------------------------------------------------------
+- id: sauna_mcb_off_actions
+  alias: "Sauna: MCB Turned OFF Actions"
+  description: "Schedule ventilator delayed off and adjust floor heating when sauna turns off"
+  mode: restart
+
+  trigger:
+    - platform: state
+      entity_id: switch.sauna_mcb
+      from: "on"
+      to: "off"
+
+  action:
+    # Start delayed off timer for ventilator (if enabled and ventilator is on)
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.sauna_ventilator_control_enabled
+              state: "on"
+            - condition: state
+              entity_id: switch.sauna_ventilator
+              state: "on"
+          sequence:
+            - service: timer.start
+              target:
+                entity_id: timer.sauna_ventilator_delay_off
+              data:
+                duration: "{{ states('input_number.sauna_ventilator_delay_off_minutes') | int * 60 }}"
+            - service: system_log.write
+              data:
+                message: "Ventilator scheduled to turn off in {{ states('input_number.sauna_ventilator_delay_off_minutes') }} minutes"
+                level: info
+                logger: homeassistant.sauna
+
+    # Set floor heating to "sauna off" temperature (if enabled)
+    - condition: state
+      entity_id: input_boolean.sauna_floor_heating_control_enabled
+      state: "on"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.sauna_floor_heating
+      data:
+        temperature: "{{ states('input_number.sauna_floor_heating_temp_off') | int }}"
+
+# -----------------------------------------------------------------------------
+# Ventilator Delayed Off Timer Finished
+# -----------------------------------------------------------------------------
+- id: sauna_ventilator_delayed_off
+  alias: "Sauna: Ventilator Delayed Off Timer Finished"
+  description: "Turn off ventilator when delay timer finishes"
+  mode: single
+
+  trigger:
+    - platform: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.sauna_ventilator_delay_off
+
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_ventilator
+    - service: system_log.write
+      data:
+        message: "Ventilator delayed off timer finished - ventilator turned OFF"
+        level: info
+        logger: homeassistant.sauna
+
+# -----------------------------------------------------------------------------
+# Ventilator Keep-Alive (Prevent Auto-Off)
+# -----------------------------------------------------------------------------
+# Cycles the ventilator briefly to reset any built-in auto-off timer.
+# Only runs when sauna MCB is ON or during cooldown period.
+# -----------------------------------------------------------------------------
+- id: sauna_ventilator_keep_alive
+  alias: "Sauna: Ventilator Keep-Alive Cycle"
+  description: "Cycle ventilator to prevent built-in auto-off"
+  mode: single
+
+  trigger:
+    - platform: time_pattern
+      minutes: "/25"  # Every 25 minutes
+
+  condition:
+    - condition: state
+      entity_id: input_boolean.sauna_ventilator_control_enabled
+      state: "on"
+    - condition: state
+      entity_id: switch.sauna_ventilator
+      state: "on"
+    # Only when sauna is on OR during delayed off period
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: switch.sauna_mcb
+          state: "on"
+        - condition: state
+          entity_id: timer.sauna_ventilator_delay_off
+          state: "active"
+
+  action:
+    - service: system_log.write
+      data:
+        message: "Ventilator keep-alive: cycling OFF then ON"
+        level: debug
+        logger: homeassistant.sauna
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_ventilator
+    - delay:
+        seconds: 2
+    - service: switch.turn_on
+      target:
+        entity_id: switch.sauna_ventilator
+
+# -----------------------------------------------------------------------------
+# Door Opened While Sauna Hot - Optional Notification
+# -----------------------------------------------------------------------------
+- id: sauna_door_opened_while_hot
+  alias: "Sauna: Door Opened While Hot"
+  description: "Notify when door is opened while sauna is hot (optional)"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.sauna_door
+      from: "off"
+      to: "on"
+
+  condition:
+    # Sauna must be hot (above 50°C)
+    - condition: numeric_state
+      entity_id: sensor.sauna_temperature
+      above: 50
+    # MCB must be on
+    - condition: state
+      entity_id: switch.sauna_mcb
+      state: "on"
+
+  action:
+    - service: system_log.write
+      data:
+        message: "Sauna door opened at {{ states('sensor.sauna_temperature') }}°C"
+        level: info
+        logger: homeassistant.sauna
+

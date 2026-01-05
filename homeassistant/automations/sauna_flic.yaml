@@ -1,0 +1,157 @@
+# =============================================================================
+# Sauna Flic Button Webhook Automations
+# =============================================================================
+# These automations handle Flic button presses via webhook.
+# Configure your Flic button to call these webhook URLs:
+#
+# Click:        https://homeassistant.local/api/webhook/sauna_flic_click
+# Double Click: https://homeassistant.local/api/webhook/sauna_flic_double_click
+# Hold:         https://homeassistant.local/api/webhook/sauna_flic_hold
+#
+# You can also use the internal URL format:
+# http://homeassistant.local:8123/api/webhook/sauna_flic_click
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Flic Button - Single Click (Toggle MCB)
+# -----------------------------------------------------------------------------
+- id: sauna_flic_click
+  alias: "Sauna: Flic Click - Toggle MCB"
+  description: "Toggle sauna MCB on single Flic button click"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    - platform: webhook
+      webhook_id: sauna_flic_click
+      allowed_methods:
+        - POST
+        - GET
+      local_only: false  # Set to true if Flic hub is on local network
+
+  action:
+    - service: switch.toggle
+      target:
+        entity_id: switch.sauna_mcb
+    - service: system_log.write
+      data:
+        message: "Flic button CLICK - MCB toggled to {{ states('switch.sauna_mcb') }}"
+        level: info
+        logger: homeassistant.sauna
+
+# -----------------------------------------------------------------------------
+# Flic Button - Double Click (Turn ON)
+# -----------------------------------------------------------------------------
+- id: sauna_flic_double_click
+  alias: "Sauna: Flic Double Click - MCB ON"
+  description: "Turn sauna MCB ON on double Flic button click"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    - platform: webhook
+      webhook_id: sauna_flic_double_click
+      allowed_methods:
+        - POST
+        - GET
+      local_only: false
+
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.sauna_mcb
+    - service: system_log.write
+      data:
+        message: "Flic button DOUBLE CLICK - MCB turned ON"
+        level: info
+        logger: homeassistant.sauna
+
+# -----------------------------------------------------------------------------
+# Flic Button - Hold (Turn OFF)
+# -----------------------------------------------------------------------------
+- id: sauna_flic_hold
+  alias: "Sauna: Flic Hold - MCB OFF"
+  description: "Turn sauna MCB OFF on Flic button hold"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    - platform: webhook
+      webhook_id: sauna_flic_hold
+      allowed_methods:
+        - POST
+        - GET
+      local_only: false
+
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.sauna_mcb
+    - service: system_log.write
+      data:
+        message: "Flic button HOLD - MCB turned OFF"
+        level: info
+        logger: homeassistant.sauna
+
+# -----------------------------------------------------------------------------
+# Alternative: Single Webhook with Action Parameter
+# -----------------------------------------------------------------------------
+# If you prefer a single webhook that receives the action type as a parameter:
+# URL: https://homeassistant.local/api/webhook/sauna_flic?action=click
+# -----------------------------------------------------------------------------
+- id: sauna_flic_universal
+  alias: "Sauna: Flic Universal Webhook"
+  description: "Handle all Flic button actions via single webhook with action parameter"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    - platform: webhook
+      webhook_id: sauna_flic
+      allowed_methods:
+        - POST
+        - GET
+      local_only: false
+
+  action:
+    - choose:
+        # Click = Toggle
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.query.action == 'click' or trigger.json.action == 'click' }}"
+          sequence:
+            - service: switch.toggle
+              target:
+                entity_id: switch.sauna_mcb
+
+        # Double Click = ON
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.query.action == 'double_click' or trigger.json.action == 'double_click' }}"
+          sequence:
+            - service: switch.turn_on
+              target:
+                entity_id: switch.sauna_mcb
+
+        # Hold = OFF
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.query.action == 'hold' or trigger.json.action == 'hold' }}"
+          sequence:
+            - service: switch.turn_off
+              target:
+                entity_id: switch.sauna_mcb
+
+      default:
+        - service: system_log.write
+          data:
+            message: "Flic webhook received unknown action: {{ trigger.query.action | default(trigger.json.action | default('none')) }}"
+            level: warning
+            logger: homeassistant.sauna
+
+    - service: system_log.write
+      data:
+        message: "Flic button {{ trigger.query.action | default(trigger.json.action | default('unknown')) }} - MCB now {{ states('switch.sauna_mcb') }}"
+        level: info
+        logger: homeassistant.sauna
+
