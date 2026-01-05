@@ -42,4 +42,6 @@ export {
   setFloorHeatingOn,
   setFloorHeatingOff,
   getFloorHeatingStatus,
+  startFloorHeatingPolling,
+  stopPolling as stopFloorHeatingPolling,
 } from "./service.js";

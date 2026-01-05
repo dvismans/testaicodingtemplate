@@ -37,6 +37,8 @@ const log = createLogger("heating");
 
 let state: FloorHeatingState = INITIAL_FLOOR_HEATING_STATE;
 let device: InstanceType<typeof TuyAPI> | null = null;
+let pollInterval: Timer | null = null;
+const POLL_INTERVAL_MS = 30000; // Poll every 30 seconds
 
 // =============================================================================
 // State Accessors
@@ -137,6 +139,8 @@ async function ensureConnected(): Promise<Result<true, FloorHeatingError>> {
  * Disconnect from floor heating device.
  */
 export function disconnectFloorHeating(): void {
+  stopPolling();
+
   if (device) {
     try {
       device.disconnect();
@@ -148,6 +152,59 @@ export function disconnectFloorHeating(): void {
 
   state = INITIAL_FLOOR_HEATING_STATE;
   log.info("Floor heating disconnected");
+}
+
+/**
+ * Start periodic status polling.
+ * Reconnects and fetches status every 30 seconds.
+ */
+export function startFloorHeatingPolling(): void {
+  if (pollInterval) {
+    return; // Already polling
+  }
+
+  log.info("Starting floor heating status polling");
+
+  // Initial poll
+  pollFloorHeatingStatus();
+
+  // Set up periodic polling
+  pollInterval = setInterval(() => {
+    pollFloorHeatingStatus();
+  }, POLL_INTERVAL_MS);
+}
+
+/**
+ * Stop periodic status polling.
+ */
+export function stopPolling(): void {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+    log.info("Stopped floor heating status polling");
+  }
+}
+
+/**
+ * Poll floor heating status once.
+ * Connects if needed, fetches status, broadcasts to SSE.
+ */
+async function pollFloorHeatingStatus(): Promise<void> {
+  const config = getFloorHeatingConfig();
+  if (!config) {
+    return;
+  }
+
+  try {
+    const result = await getFloorHeatingStatus();
+    if (result.isErr()) {
+      log.debug({ error: result.error.message }, "Floor heating poll failed");
+    }
+    // Success case: status is already broadcast via handleStatusUpdate
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.debug({ error: message }, "Floor heating poll error");
+  }
 }
 
 // =============================================================================
@@ -398,8 +455,8 @@ export async function setFloorHeatingOff(): Promise<
     return tempResult;
   }
 
-  // Disconnect after deactivation to not keep connection open
-  disconnectFloorHeating();
+  // Note: We keep the connection open for status polling
+  // Disconnect happens when app shuts down via disconnectFloorHeating()
 
   log.info(
     { targetTemp: config.targetTempOff },

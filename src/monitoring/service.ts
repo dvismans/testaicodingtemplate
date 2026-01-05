@@ -16,6 +16,8 @@ import {
   disconnectFloorHeating,
   setFloorHeatingOff,
   setFloorHeatingOn,
+  startFloorHeatingPolling,
+  stopFloorHeatingPolling,
 } from "../floor-heating/index.js";
 import {
   createLogger,
@@ -413,6 +415,9 @@ export async function startMonitoringLoop(): Promise<void> {
         "Failed to connect to floor heating - continuing without floor heating control",
       );
     } else {
+      // Start polling for floor heating status (broadcasts to SSE)
+      startFloorHeatingPolling();
+
       // Sync floor heating state on startup based on MCB status
       const mcbStatus = getLastMcbLocalStatus();
       if (mcbStatus && !mcbStatus.isOn) {

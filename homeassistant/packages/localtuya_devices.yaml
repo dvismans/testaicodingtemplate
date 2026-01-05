@@ -1,0 +1,130 @@
+# =============================================================================
+# LocalTuya Device Configuration
+# =============================================================================
+# This file documents the LocalTuya configuration for Tuya devices.
+# LocalTuya is configured via the UI (Settings > Devices & Services > LocalTuya)
+# but this documents the expected DPS (Data Points) for each device.
+#
+# IMPORTANT: You need to configure these devices via the HA UI, not YAML.
+# This file is for documentation purposes.
+# =============================================================================
+
+# =============================================================================
+# MCB (Main Circuit Breaker) - Tuya Smart Switch
+# =============================================================================
+# Device Type: Smart Switch / Circuit Breaker
+# Entity: switch.sauna_mcb
+#
+# Required credentials (from your .env):
+#   - Device ID: MCB_DEVICE_ID
+#   - Local Key: MCB_LOCAL_KEY
+#   - IP Address: MCB_DEVICE_IP
+#   - Protocol: 3.3 (or 3.4)
+#
+# DPS (Data Points) for typical Tuya MCB:
+#   DPS 1:  Switch state (bool) - ON/OFF
+#   DPS 9:  Countdown (seconds) - optional auto-off timer
+#   DPS 17: Voltage (V * 10) - e.g., 2300 = 230.0V
+#   DPS 18: Current (mA) - e.g., 1500 = 1.5A
+#   DPS 19: Power (W * 10) - e.g., 3450 = 345.0W
+#   DPS 20: Total Energy (kWh * 100) - e.g., 1234 = 12.34 kWh
+#
+# LocalTuya Configuration:
+#   Entity Type: Switch
+#   ID: 1
+#   Friendly Name: Sauna MCB
+#   Current: DPS 18 (divide by 1000 for Amps)
+#   Power: DPS 19 (divide by 10 for Watts)
+#   Voltage: DPS 17 (divide by 10 for Volts)
+# =============================================================================
+
+# =============================================================================
+# Floor Heating Thermostat - Tuya Thermostat
+# =============================================================================
+# Device Type: Thermostat / Climate Control
+# Entity: climate.sauna_floor_heating
+#
+# Required credentials (from your .env):
+#   - Device ID: FLOOR_HEATING_DEVICE_ID
+#   - Local Key: FLOOR_HEATING_LOCAL_KEY
+#   - Protocol: 3.3 (or 3.4)
+#
+# DPS (Data Points) for typical Tuya Thermostat:
+#   DPS 1:  Switch state (bool) - ON/OFF
+#   DPS 2:  Target temperature (int, scaled)
+#   DPS 3:  Current temperature (int, scaled)
+#   DPS 4:  Mode (enum) - e.g., "manual", "auto", "holiday"
+#   DPS 6:  Lock (bool) - child lock
+#   DPS 102: Floor temperature (some models)
+#
+# Temperature scaling varies by device:
+#   - Some use raw °C (e.g., 21 = 21°C)
+#   - Some use * 10 (e.g., 210 = 21.0°C)
+#   - Some use * 2 (e.g., 42 = 21°C)
+#
+# LocalTuya Configuration:
+#   Entity Type: Climate
+#   ID: 1
+#   Friendly Name: Sauna Floor Heating
+#   Target Temperature DP: 2
+#   Current Temperature DP: 3
+#   Temperature Step: 1.0
+#   Min Temperature: 5
+#   Max Temperature: 35
+#   Temperature Scaling Factor: Check your device (usually 1 or 0.1)
+# =============================================================================
+
+# =============================================================================
+# Shelly Ventilator - NOT LocalTuya
+# =============================================================================
+# The ventilator uses a Shelly relay, not Tuya.
+# Shelly is configured via the native Home Assistant Shelly integration.
+#
+# Entity: switch.sauna_ventilator
+#
+# Configuration:
+#   - Go to Settings > Devices & Services > Add Integration > Shelly
+#   - Enter the Shelly device IP address
+#   - HA will auto-discover the relay
+#
+# If you need to use REST commands instead:
+# =============================================================================
+
+rest_command:
+  # Shelly relay control via REST (alternative to Shelly integration)
+  shelly_ventilator_on:
+    url: "http://{{ shelly_ip }}/relay/0?turn=on"
+    method: GET
+  
+  shelly_ventilator_off:
+    url: "http://{{ shelly_ip }}/relay/0?turn=off"
+    method: GET
+
+# =============================================================================
+# How to Get LocalTuya Credentials
+# =============================================================================
+# 
+# 1. Create Tuya IoT Developer Account:
+#    https://iot.tuya.com/
+#
+# 2. Create a Cloud Project:
+#    - Region: Western Europe (or your region)
+#    - Development Method: Smart Home
+#
+# 3. Link your Tuya/Smart Life app:
+#    - Go to: Devices > Link Tuya App Account
+#    - Scan QR code with Tuya/Smart Life app
+#
+# 4. Get Device Credentials:
+#    - Go to: Devices > All Devices
+#    - Click on your device
+#    - Copy: Device ID, Local Key
+#    - Note: Local Key may be under "Data Points"
+#
+# 5. Find Device IP:
+#    - Check your router's DHCP table
+#    - Or use: nmap -sP 192.168.1.0/24
+#    - Tuya devices usually have MAC starting with specific prefixes
+#
+# =============================================================================
+
